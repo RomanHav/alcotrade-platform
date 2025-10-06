@@ -7,9 +7,10 @@ cloudinary.config({ secure: true });
 
 type Body = { name?: string; link?: string | null; image?: string | null };
 
-export async function PATCH(req: Request, { params }: { params: Record<string, string> }) {
+export async function PATCH(req: Request, ctx: any) {
   try {
-    const id = params.id;
+    const { id } = (ctx?.params ?? {}) as { id: string };
+
     const body = (await req.json()) as Body;
 
     const prev = await prisma.partner.findUnique({
@@ -77,9 +78,9 @@ export async function PATCH(req: Request, { params }: { params: Record<string, s
   }
 }
 
-export async function DELETE(_req: Request, { params }: { params: Record<string, string> }) {
+export async function DELETE(_req: Request, ctx: any) {
   try {
-    const id = params.id;
+    const { id } = (ctx?.params ?? {}) as { id: string };
 
     const partner = await prisma.partner.findUnique({
       where: { id },
