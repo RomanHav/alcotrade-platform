@@ -5,14 +5,12 @@ import { extractCloudinaryPublicId } from '@/lib/cloudinary-publicid';
 
 cloudinary.config({ secure: true });
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+type Body = { name?: string; link?: string | null; image?: string | null };
+
+export async function PATCH(req: Request, { params }: { params: Record<string, string> }) {
   try {
-    const { id } = params;
-    const body = (await req.json()) as {
-      name?: string;
-      link?: string | null;
-      image?: string | null;
-    };
+    const id = params.id;
+    const body = (await req.json()) as Body;
 
     const prev = await prisma.partner.findUnique({
       where: { id },
@@ -79,9 +77,9 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   }
 }
 
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(_req: Request, { params }: { params: Record<string, string> }) {
   try {
-    const { id } = params;
+    const id = params.id;
 
     const partner = await prisma.partner.findUnique({
       where: { id },
