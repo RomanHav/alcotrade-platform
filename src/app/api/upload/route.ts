@@ -9,7 +9,6 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// POST /api/upload  (FormData: file, alt?, folder?)
 export async function POST(req: Request) {
   try {
     const form = await req.formData();

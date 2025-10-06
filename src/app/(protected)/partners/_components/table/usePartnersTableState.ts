@@ -21,6 +21,7 @@ export function usePartnersTableState(
   const onCancelEdit = React.useCallback((id: string) => {
     setEditingId((curr) => (curr === id ? null : curr));
     setDrafts((d) => {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { [id]: _remove, ...rest } = d;
       return rest;
     });
@@ -54,6 +55,7 @@ export function usePartnersTableState(
         setData((prev) => prev.map((p) => (p.id === id ? saved : p)));
 
         setDrafts((d) => {
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
           const { [id]: _remove, ...rest } = d;
           return rest;
         });

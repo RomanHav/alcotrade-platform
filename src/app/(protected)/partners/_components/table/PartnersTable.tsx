@@ -19,68 +19,74 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { makeColumns } from './makeColumns';
-import { usePartnersTableState } from './usePartnersTableState';
-import { useTableHotkeys } from './useTableHotkeys';
 import ConfirmDialog from '../common/ConfirmDialog';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import {
+  cancelEdit,
+  draftChange,
+  startEdit,
+  setDeleting,
+  removeRowsByIds,
+} from '@/store/slices/partnersSlice';
+
+import { savePartnerRow, bulkDeletePartners } from '@/store/operations/partnersOperation';
+
+import {
+  selectPartners,
+  selectEditingId,
+  selectDrafts,
+  selectDeleting,
+  selectSearch,
+} from '@/store/selectors/partnersSelector';
+
+import { uploadPartnerLogo } from '@/store/operations/partnersOperation';
 import type { Partner } from '../core/types';
 
-type Props = {
-  partners: Partner[];
-  onSaveRow?: (p: Partner) => Promise<Partner>;
-  onUploadImage?: (file: File, ctx: { publicId: string }) => Promise<{ url: string }>;
-  onDeleteRows?: (ids: string[]) => void | Promise<void>;
-  search?: string;
-  addTrigger?: number;
-};
+export default function PartnersTable() {
+  const dispatch = useAppDispatch();
+  const data = useAppSelector(selectPartners);
+  const editingId = useAppSelector(selectEditingId);
+  const drafts = useAppSelector(selectDrafts);
+  const deleting = useAppSelector(selectDeleting);
+  const search = useAppSelector(selectSearch);
 
-export default function PartnersTable({
-  partners,
-  onSaveRow,
-  onUploadImage,
-  onDeleteRows,
-  search = '',
-  addTrigger,
-}: Props) {
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
 
-  const {
-    data,
-    setData,
-    editingId,
-    drafts,
-    setDrafts,
-    onStartEdit,
-    onCancelEdit,
-    onDraftChange,
-    onSaveEdit,
-  } = usePartnersTableState(partners, onSaveRow);
-
-  const newRowIdsRef = React.useRef<Set<string>>(new Set());
-  const lastTriggerRef = React.useRef<number | undefined>(undefined);
-
-  React.useEffect(() => {
-    if (!addTrigger || lastTriggerRef.current === addTrigger) return;
-    lastTriggerRef.current = addTrigger;
-
-    const id = `tmp_${Date.now()}`;
-    const fresh: Partner = { id, name: '', link: null, image: null };
-
-    setData((prev) => [fresh, ...prev]);
-    newRowIdsRef.current.add(id);
-    onStartEdit(fresh);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [addTrigger]);
-
   const cancelAndMaybeRemove = React.useCallback(
     (id: string) => {
-      if (newRowIdsRef.current.has(id)) {
-        setData((prev) => prev.filter((p) => p.id !== id));
-        newRowIdsRef.current.delete(id);
-      }
-      onCancelEdit(id);
+      dispatch(cancelEdit(id));
     },
-    [onCancelEdit, setData],
+    [dispatch],
+  );
+
+  const onStartEdit = React.useCallback(
+    (p: Partner) => {
+      dispatch(startEdit(p));
+    },
+    [dispatch],
+  );
+
+  const onDraftChange = React.useCallback(
+    (id: string, key: keyof Partner, value: any) => {
+      dispatch(draftChange({ id, key, value }));
+    },
+    [dispatch],
+  );
+
+  const onSaveEdit = React.useCallback(
+    (id: string) => {
+      dispatch(savePartnerRow({ id }));
+    },
+    [dispatch],
+  );
+
+  const onUploadImage = React.useCallback(
+    async (file: File, ctx: { publicId: string }) => {
+      const res = await dispatch(uploadPartnerLogo({ file, publicId: ctx.publicId })).unwrap();
+      return { url: res.url };
+    },
+    [dispatch],
   );
 
   const normalizedQuery = React.useMemo(
@@ -126,8 +132,6 @@ export default function PartnersTable({
     ],
   );
 
-  useTableHotkeys(editingId, onSaveEdit, cancelAndMaybeRemove);
-
   const table = useReactTable({
     data: viewData,
     columns,
@@ -140,31 +144,22 @@ export default function PartnersTable({
     initialState: { pagination: { pageSize: 6 } },
   });
 
-  const [deleting, setDeleting] = React.useState(false);
-
   const handleDeleteSelected = React.useCallback(async () => {
     const ids = table.getSelectedRowModel().rows.map((r) => r.original.id);
     if (ids.length === 0) return;
 
-    setDeleting(true);
     try {
-      if (editingId && ids.includes(editingId)) {
-        cancelAndMaybeRemove(editingId);
-      }
-      setData((prev) => prev.filter((p) => !ids.includes(p.id)));
+      dispatch(setDeleting(true));
+
+      dispatch(removeRowsByIds(ids));
       table.resetRowSelection();
-      setDrafts((d) => {
-        const copy = { ...d };
-        ids.forEach((id) => delete copy[id]);
-        return copy;
-      });
-      await onDeleteRows?.(ids);
+      await dispatch(bulkDeletePartners({ ids })).unwrap();
     } catch (e) {
       console.error('Delete error:', e);
     } finally {
-      setDeleting(false);
+      dispatch(setDeleting(false));
     }
-  }, [table, editingId, cancelAndMaybeRemove, setData, setDrafts, onDeleteRows]);
+  }, [table, dispatch]);
 
   const selectedCount = table.getSelectedRowModel().rows.length;
 
@@ -228,7 +223,7 @@ export default function PartnersTable({
               onConfirm={handleDeleteSelected}
               disabled={deleting}
               trigger={
-                <Button variant="destructive" disabled={deleting} className='cursor-pointer'>
+                <Button variant="destructive" disabled={deleting} className="cursor-pointer">
                   {deleting ? 'Видаляю…' : `Видалити обрані (${selectedCount})`}
                 </Button>
               }
