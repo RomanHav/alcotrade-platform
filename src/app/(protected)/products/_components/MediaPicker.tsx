@@ -1,3 +1,4 @@
+// app/(protected)/products/_components/MediaPicker.tsx
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
@@ -12,10 +13,15 @@ import {
   useSensors,
   DragEndEvent,
 } from '@dnd-kit/core';
-import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import {
+  SortableContext,
+  useSortable,
+  arrayMove,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { addImages, removeImage, reorderImages, setCover } from '@/store/slices/productFormSlice';
+import { addImages, removeImage, setField } from '@/store/slices/productFormSlice';
 
 export default function MediaPicker() {
   const dispatch = useAppDispatch();
@@ -25,7 +31,6 @@ export default function MediaPicker() {
   const [busy, setBusy] = useState(false);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
-
   const pick = () => inputRef.current?.click();
 
   const coverUrl = useMemo(() => {
@@ -57,9 +62,7 @@ export default function MediaPicker() {
           });
         }
       }
-      if (added.length) {
-        dispatch(addImages(added));
-      }
+      if (added.length) dispatch(addImages(added));
     } finally {
       setBusy(false);
       if (inputRef.current) inputRef.current.value = '';
@@ -79,7 +82,11 @@ export default function MediaPicker() {
   const onDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
     if (!over || active.id === over.id) return;
-    dispatch(reorderImages({ activeId: String(active.id), overId: String(over.id) }));
+    const oldIndex = images.findIndex((i) => i.id === active.id);
+    const newIndex = images.findIndex((i) => i.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+    const next = arrayMove(images, oldIndex, newIndex);
+    dispatch(setField({ key: 'images', value: next }));
   };
 
   return (
@@ -127,7 +134,7 @@ export default function MediaPicker() {
                   url={m.url}
                   alt={m.alt ?? ''}
                   isCover={coverId === m.id}
-                  onMakeCover={() => dispatch(setCover(m.id))}
+                  onMakeCover={() => dispatch(setField({ key: 'coverId', value: m.id }))}
                   onRemove={() => onRemove(m.id, m.publicId)}
                 />
               ))}
