@@ -90,9 +90,6 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
     <div className="px-4 pt-6 md:px-6">
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Продукти</h1>
-        <a href="/products/new/" className="btn btn-primary">
-          Додати новий
-        </a>
       </div>
       <ProductsTable items={items} total={total} page={page} pageSize={pageSize} brands={brands} />
     </div>

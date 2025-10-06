@@ -1,5 +1,5 @@
-import { createSlice, PayloadAction, Draft } from '@reduxjs/toolkit';
-import { arrayMove } from '@dnd-kit/sortable';
+// store/slices/productFormSlice.ts
+import { createSlice, type PayloadAction, type Draft } from '@reduxjs/toolkit';
 
 export type MediaItem = {
   id: string;
@@ -29,44 +29,24 @@ export type ProductFormState = {
   variants: VariantForm[];
   images: MediaItem[];
   coverId: string | null;
-  coverFallbackUrl: string | null; // если coverId не найден в images — показываем это
+  coverFallbackUrl: string | null;
 };
 
 const initialState: ProductFormState = {
   status: 'DRAFT',
-  variants: [{ position: 0 }, { position: 1 }, { position: 2 }],
+  variants: [], // пусто по умолчанию — как в Shopify
   images: [],
   coverId: null,
   coverFallbackUrl: null,
 };
 
-function ensureCover(state: Draft<ProductFormState>) {
+function ensureCover(state: ProductFormState) {
   if (state.images.length === 0) {
     state.coverId = null;
     return;
   }
-  const idx = state.images.findIndex((m) => m.id === state.coverId);
-  if (idx === -1) {
-    state.coverId = state.images[0].id;
-  }
-}
-
-function parseVolumeToMl(label: string): number | undefined {
-  const raw = label.replace(',', '.').toLowerCase().trim();
-
-  const mLfromL = raw.match(/^([0-9]+(\.[0-9]+)?)\s*л$/i);
-  if (mLfromL) {
-    const liters = Number(mLfromL[1]);
-    if (!Number.isNaN(liters)) return Math.round(liters * 1000);
-  }
-
-  const mL = raw.match(/^([0-9]+)\s*(мл|ml)?$/i);
-  if (mL) {
-    const v = Number(mL[1]);
-    if (!Number.isNaN(v)) return v;
-  }
-
-  return undefined;
+  const exists = state.images.some((m) => m.id === state.coverId);
+  if (!exists) state.coverId = state.images[0].id;
 }
 
 const productFormSlice = createSlice({
@@ -75,84 +55,79 @@ const productFormSlice = createSlice({
   reducers: {
     reset: () => initialState,
 
-    hydrateFromServer: (state, action: PayloadAction<Partial<ProductFormState>>) => {
-      const p = action.payload;
-      state.id = p.id;
-      state.name = p.name;
-      state.status = p.status ?? 'DRAFT';
-      state.brandId = p.brandId;
-      state.description = p.description;
-      state.seoTitle = p.seoTitle ?? null;
-      state.seoDescription = p.seoDescription ?? null;
-      state.variants = p.variants?.length ? p.variants : initialState.variants;
-      state.images = p.images ?? [];
-      state.coverId = p.coverId ?? null;
-      state.coverFallbackUrl = p.coverFallbackUrl ?? null;
-      ensureCover(state);
+    // Полная переинициализация (новый объект state)
+    hydrateFromServer: (_state, action: PayloadAction<Partial<ProductFormState>>) => {
+      const p = action.payload || {};
+      const next: ProductFormState = {
+        status: p.status ?? 'DRAFT',
+        id: p.id,
+        name: p.name ?? '',
+        brandId: p.brandId,
+        description: p.description,
+        seoTitle: p.seoTitle ?? null,
+        seoDescription: p.seoDescription ?? null,
+        variants: Array.isArray(p.variants) ? p.variants : [],
+        images: p.images ?? [],
+        coverId: p.coverId ?? null,
+        coverFallbackUrl: p.coverFallbackUrl ?? null,
+      };
+      ensureCover(next);
+      return next;
     },
 
+    // ✅ Явно типизируем state как Draft<ProductFormState> — уходит TS7006
     setField: <K extends keyof ProductFormState>(
       state: Draft<ProductFormState>,
       action: PayloadAction<{ key: K; value: ProductFormState[K] }>,
     ) => {
       state[action.payload.key] = action.payload.value as ProductFormState[K];
       if (action.payload.key === 'images' || action.payload.key === 'coverId') {
-        ensureCover(state);
+        ensureCover(state as ProductFormState);
       }
     },
 
-    addVariant: (state) => {
-      state.variants.push({ position: state.variants.length });
-    },
-    removeVariant: (state, action: PayloadAction<number>) => {
-      state.variants = state.variants.filter((_, i) => i !== action.payload);
-      state.variants = state.variants.map((v, i) => ({ ...v, position: i }));
-    },
-    updateVariant: (
-      state,
-      action: PayloadAction<{ index: number; patch: Partial<VariantForm> }>,
-    ) => {
-      const { index, patch } = action.payload;
-      const arr = [...state.variants];
-      arr[index] = { ...arr[index], ...patch, position: arr[index].position };
-      state.variants = arr;
-    },
-
+    // ===== Варианты (Shopify-подобно) =====
     setVariantsFromValues: (
       state,
       action: PayloadAction<{ optionName: string; values: string[] }>,
     ) => {
-      const values = action.payload.values.map((s) => s.trim()).filter(Boolean);
-
+      const values = action.payload.values.map((v) => v.trim()).filter(Boolean);
       state.variants = values.map((label, i) => ({
         position: i,
         label,
-        volumeMl: parseVolumeToMl(label),
       }));
+    },
+
+    removeVariant: (state, action: PayloadAction<number>) => {
+      state.variants = state.variants
+        .filter((_, i) => i !== action.payload)
+        .map((v, i) => ({ ...v, position: i }));
     },
 
     setVariantImage: (
       state,
       action: PayloadAction<{
         index: number;
-        media: { id: string; url: string; publicId?: string | null };
+        media: { id: string; url: string; publicId?: string };
       }>,
     ) => {
       const { index, media } = action.payload;
-      if (!state.variants[index]) return;
-      state.variants[index].imageId = media.id;
-      state.variants[index].imageUrl = media.url;
-      state.variants[index].imagePublicId = media.publicId ?? null;
+      const v = state.variants[index];
+      if (!v) return;
+      v.imageId = media.id;
+      v.imageUrl = media.url;
+      v.imagePublicId = media.publicId ?? null;
     },
 
     clearVariantImage: (state, action: PayloadAction<number>) => {
-      const idx = action.payload;
-      if (!state.variants[idx]) return;
-      state.variants[idx].imageId = null;
-      state.variants[idx].imageUrl = null;
-      state.variants[idx].imagePublicId = null;
+      const v = state.variants[action.payload];
+      if (!v) return;
+      v.imageId = null;
+      v.imageUrl = null;
+      v.imagePublicId = null;
     },
 
+    // ===== Галерея =====
     addImages: (state, action: PayloadAction<MediaItem[]>) => {
       state.images = [...state.images, ...action.payload];
       if (!state.coverId && action.payload.length > 0) {
@@ -160,6 +135,7 @@ const productFormSlice = createSlice({
       }
       ensureCover(state);
     },
+
     removeImage: (state, action: PayloadAction<string>) => {
       state.images = state.images.filter((m) => m.id !== action.payload);
       if (state.coverId === action.payload) {
@@ -167,15 +143,19 @@ const productFormSlice = createSlice({
       }
       ensureCover(state);
     },
+
+    // ✅ Вернули экшены, которые ждёт MediaPicker
     reorderImages: (state, action: PayloadAction<{ activeId: string; overId: string }>) => {
       const { activeId, overId } = action.payload;
       if (activeId === overId) return;
       const oldIndex = state.images.findIndex((i) => i.id === activeId);
       const newIndex = state.images.findIndex((i) => i.id === overId);
       if (oldIndex < 0 || newIndex < 0) return;
-      state.images = arrayMove(state.images, oldIndex, newIndex);
+      const [m] = state.images.splice(oldIndex, 1);
+      state.images.splice(newIndex, 0, m);
       ensureCover(state);
     },
+
     setCover: (state, action: PayloadAction<string | null>) => {
       state.coverId = action.payload;
       ensureCover(state);
@@ -187,16 +167,14 @@ export const {
   reset,
   hydrateFromServer,
   setField,
-  addVariant,
-  removeVariant,
-  updateVariant,
   setVariantsFromValues,
+  removeVariant,
   setVariantImage,
   clearVariantImage,
   addImages,
   removeImage,
-  reorderImages,
-  setCover,
+  reorderImages, // 👈 экспортируем
+  setCover, // 👈 экспортируем
 } = productFormSlice.actions;
 
 export default productFormSlice.reducer;

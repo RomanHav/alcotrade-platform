@@ -20,7 +20,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,109 +33,204 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { Trash2, Pencil, Filter, SlidersHorizontal } from 'lucide-react';
+import { Trash2, Pencil, Filter, SlidersHorizontal, X } from 'lucide-react';
+import { useAppDispatch, useAppSelector } from '@/store/hooks';
+import { clearSelection, setSelectedIds } from '@/store/slices/productsUiSlice';
 
 type Item = {
   id: string;
   name: string;
   slug: string;
-  status: 'ACTIVE' | 'DRAFT' | 'ARCHIVE'; // ✅ твой enum
+  status: 'ACTIVE' | 'DRAFT' | 'ARCHIVE';
   brand: { id: string; name: string; slug: string };
   cover?: { url: string | null; alt?: string | null } | null;
 };
 
-export default function ProductsTable(props: {
+/* helpers to break feedback loops */
+function arraysEqual(a: string[], b: string[]) {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+function IndeterminateCheckbox({
+  checked,
+  indeterminate,
+  onChange,
+  title,
+}: {
+  checked: boolean;
+  indeterminate?: boolean;
+  onChange: (next: boolean) => void;
+  title?: string;
+}) {
+  const ref = React.useRef<HTMLInputElement>(null);
+  React.useEffect(() => {
+    if (ref.current) ref.current.indeterminate = !!indeterminate && !checked;
+  }, [indeterminate, checked]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      className="border-input bg-background ring-offset-background focus-visible:ring-ring h-4 w-4 rounded border focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+      checked={checked}
+      onChange={(e) => onChange(e.target.checked)}
+      title={title}
+      aria-label={title}
+    />
+  );
+}
+
+export default function ProductsTable({
+  items,
+  total,
+  page,
+  pageSize,
+  brands,
+}: {
   items: Item[];
   total: number;
   page: number;
   pageSize: number;
   brands: { id: string; name: string; slug: string }[];
 }) {
-  const { items, total, page, pageSize, brands } = props;
-  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
-  const [sorting, setSorting] = React.useState<SortingState>([]);
   const router = useRouter();
   const sp = useSearchParams();
+  const dispatch = useAppDispatch();
+  const selectedIds = useAppSelector((s) => s.productsUi.selectedIds);
 
-  const columns: ColumnDef<Item>[] = [
-    {
-      id: 'select',
-      header: ({ table }) => (
-        <Checkbox
-          checked={table.getIsAllPageRowsSelected()}
-          onCheckedChange={(v) => table.toggleAllPageRowsSelected(!!v)}
-          aria-label="Вибрати всі"
-        />
-      ),
-      cell: ({ row }) => (
-        <Checkbox checked={row.getIsSelected()} onCheckedChange={(v) => row.toggleSelected(!!v)} />
-      ),
-      size: 32,
+  // ids видимых на текущей странице (стабилизируем мемо)
+  const pageIds = React.useMemo(() => items.map((i) => i.id), [items]);
+
+  const rowSelection = React.useMemo(() => {
+    const o: RowSelectionState = {};
+    for (const id of selectedIds) if (pageIds.includes(id)) o[id] = true;
+    return o;
+  }, [selectedIds, pageIds]);
+
+  const handleRowSelectionChange = React.useCallback(
+    (updater: RowSelectionState | ((old: RowSelectionState) => RowSelectionState)) => {
+      const current = rowSelection;
+      const next = typeof updater === 'function' ? (updater as any)(current) : updater;
+
+      let newIds = [...selectedIds];
+
+      for (const id of pageIds) {
+        const want = !!next[id]; // желаемое состояние для id
+        const has = newIds.includes(id); // текущее в Redux
+        if (want && !has) newIds.push(id);
+        if (!want && has) newIds = newIds.filter((x) => x !== id);
+      }
+
+      newIds.sort();
+      const prevSorted = [...selectedIds].sort();
+      if (!arraysEqual(newIds, prevSorted)) {
+        dispatch(setSelectedIds(newIds));
+      }
     },
-    {
-      id: 'thumb',
-      header: () => null,
-      cell: ({ row }) => (
-        <div className="size-8 overflow-hidden rounded-md border">
-          {row.original.cover?.url ? (
-            <Image
-              src={row.original.cover.url}
-              alt={row.original.cover.alt || row.original.name}
-              width={32}
-              height={32}
-              className="h-full w-full object-cover"
-              unoptimized
+    [rowSelection, selectedIds, pageIds, dispatch],
+  );
+
+  const columns = React.useMemo<ColumnDef<Item>[]>(
+    () => [
+      {
+        id: 'select',
+        header: ({ table }) => {
+          const all = table.getIsAllPageRowsSelected();
+          const some = table.getIsSomePageRowsSelected();
+          return (
+            <IndeterminateCheckbox
+              checked={all}
+              indeterminate={some && !all}
+              onChange={(v) => table.toggleAllPageRowsSelected(v)}
+              title="Вибрати всі"
             />
-          ) : (
-            <div className="bg-muted h-full w-full" />
-          )}
-        </div>
-      ),
-      size: 40,
-    },
-    {
-      accessorKey: 'name',
-      header: 'Назва продукту',
-      cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
-    },
-    {
-      accessorKey: 'status',
-      header: 'Статус',
-      cell: ({ row }) => <StatusBadge status={row.original.status} />,
-      size: 140,
-    },
-    {
-      accessorKey: 'brand.name',
-      header: 'Бренд',
-      cell: ({ row }) => row.original.brand.name,
-      size: 180,
-    },
-    {
-      id: 'edit',
-      header: 'Редагувати',
-      cell: ({ row }) => (
-        <a href={`/products/${row.original.id}/edit`} className="inline-flex">
-          <Pencil className="size-4" />
-        </a>
-      ),
-      size: 80,
-    },
-  ];
+          );
+        },
+        cell: ({ row }) => (
+          <IndeterminateCheckbox
+            checked={row.getIsSelected()}
+            onChange={(v) => row.toggleSelected(v)}
+            title="Вибрати"
+          />
+        ),
+        size: 32,
+      },
+      {
+        id: 'thumb',
+        header: () => null,
+        cell: ({ row }) => (
+          <div className="size-8 overflow-hidden rounded-md border">
+            {row.original.cover?.url ? (
+              <Image
+                src={row.original.cover.url}
+                alt={row.original.cover.alt || row.original.name}
+                width={32}
+                height={32}
+                className="h-full w-full object-cover"
+                unoptimized
+              />
+            ) : (
+              <div className="bg-muted h-full w-full" />
+            )}
+          </div>
+        ),
+        size: 40,
+      },
+      {
+        accessorKey: 'name',
+        header: 'Назва продукту',
+        cell: ({ row }) => <span className="font-medium">{row.original.name}</span>,
+      },
+      {
+        accessorKey: 'status',
+        header: 'Статус',
+        cell: ({ row }) => <StatusBadge status={row.original.status} />,
+        size: 140,
+      },
+      {
+        accessorKey: 'brand.name',
+        header: 'Бренд',
+        cell: ({ row }) => row.original.brand.name,
+        size: 180,
+      },
+      {
+        id: 'edit',
+        header: 'Редагувати',
+        cell: ({ row }) => (
+          <a href={`/products/${row.original.id}/edit`} className="inline-flex">
+            <Pencil className="size-4" />
+          </a>
+        ),
+        size: 80,
+      },
+    ],
+    [],
+  );
 
+  const [sorting, setSorting] = React.useState<SortingState>([]);
   const table = useReactTable({
     data: items,
     columns,
     state: { rowSelection, sorting },
-    onRowSelectionChange: setRowSelection,
+    onRowSelectionChange: handleRowSelectionChange,
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getRowId: (row) => row.id,
   });
 
-  const selectedIds = React.useMemo(
-    () => table.getSelectedRowModel().rows.map((r) => r.original.id),
-    [table],
-  );
+  React.useEffect(() => {
+    const ids = Object.entries(rowSelection)
+      .filter(([, v]) => !!v)
+      .map(([id]) => id)
+      .sort();
+
+    if (!arraysEqual(ids, selectedIds)) {
+      dispatch(setSelectedIds(ids));
+    }
+  }, [rowSelection, selectedIds, dispatch]);
 
   const applyParam = (key: string, value?: string) => {
     const params = new URLSearchParams(sp.toString());
@@ -153,13 +247,24 @@ export default function ProductsTable(props: {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ids: selectedIds }),
     });
+    dispatch(clearSelection());
     router.refresh();
   };
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  // const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  const activeFilters: { label: string; key: string }[] = [];
+  if (sp.get('brand')) {
+    const b = brands.find((x) => x.slug === sp.get('brand'));
+    activeFilters.push({ label: `Бренд: ${b?.name ?? sp.get('brand')}`, key: 'brand' });
+  }
+  if (sp.get('query'))
+    activeFilters.push({ label: `Назва продукту: ${sp.get('query')}`, key: 'query' });
+  if (sp.get('status')) activeFilters.push({ label: `Статус: ${sp.get('status')}`, key: 'status' });
 
   return (
     <div className="bg-card rounded-2xl border p-3 shadow-sm">
+      {/* верхняя панель */}
       <div className="mb-3 flex items-center gap-2">
         <Input
           placeholder="Пошук"
@@ -171,6 +276,7 @@ export default function ProductsTable(props: {
           className="w-56"
         />
 
+        {/* Фільтри */}
         <Sheet>
           <SheetTrigger asChild>
             <Button variant="outline">
@@ -181,7 +287,6 @@ export default function ProductsTable(props: {
             <SheetHeader>
               <SheetTitle>Фільтрувати за:</SheetTitle>
             </SheetHeader>
-
             <div className="mt-6 space-y-6">
               <div>
                 <div className="mb-2 text-sm font-medium">Назва продукту</div>
@@ -191,7 +296,6 @@ export default function ProductsTable(props: {
                   onBlur={(e) => applyParam('query', e.target.value || undefined)}
                 />
               </div>
-
               <div>
                 <div className="mb-2 text-sm font-medium">Статус</div>
                 <Select
@@ -204,11 +308,10 @@ export default function ProductsTable(props: {
                   <SelectContent>
                     <SelectItem value="ACTIVE">Активний</SelectItem>
                     <SelectItem value="DRAFT">Чорновик</SelectItem>
-                    <SelectItem value="ARCHIVE">Архів</SelectItem> {/* ✅ ARCHIVE */}
+                    <SelectItem value="ARCHIVE">Архів</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-
               <div>
                 <div className="mb-2 text-sm font-medium">Бренд</div>
                 <Select
@@ -227,7 +330,6 @@ export default function ProductsTable(props: {
                   </SelectContent>
                 </Select>
               </div>
-
               <Button onClick={() => router.refresh()} className="w-full">
                 Застосувати
               </Button>
@@ -238,6 +340,7 @@ export default function ProductsTable(props: {
           </SheetContent>
         </Sheet>
 
+        {/* Сортування */}
         <Sheet>
           <SheetTrigger asChild>
             <Button variant="outline">
@@ -275,14 +378,55 @@ export default function ProductsTable(props: {
         </Sheet>
 
         <div className="ml-auto flex items-center gap-2">
-          {selectedIds.length > 0 && (
-            <Button variant="destructive" onClick={onBulkDelete}>
-              <Trash2 className="mr-2 size-4" /> Видалити
-            </Button>
-          )}
+          <Button asChild>
+            <a href="/products/new">Додати новий</a>
+          </Button>
         </div>
       </div>
 
+      {/* активні фільтри */}
+      <div className="mb-2 flex flex-wrap items-center gap-3">
+        {activeFilters.length > 0 && (
+          <>
+            <span className="text-sm">Фільтри:</span>
+            {activeFilters.map((f) => (
+              <span
+                key={f.key}
+                className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs"
+              >
+                {f.label}
+                <button
+                  className="opacity-70 hover:opacity-100"
+                  onClick={() => applyParam(f.key, undefined)}
+                  title="Очистити"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </span>
+            ))}
+          </>
+        )}
+      </div>
+
+      {/* панель вибору */}
+      {selectedIds.length > 0 && (
+        <div className="bg-muted/40 mb-2 flex items-center justify-between rounded-lg border px-3 py-2">
+          <div className="text-sm">
+            Обрано: <b>{selectedIds.length}</b>{' '}
+            <button
+              className="underline opacity-70 hover:opacity-100"
+              onClick={() => dispatch(clearSelection())}
+            >
+              Очистити
+            </button>
+          </div>
+          <Button variant="destructive" onClick={onBulkDelete}>
+            <Trash2 className="mr-2 size-4" /> Видалити
+          </Button>
+        </div>
+      )}
+
+      {/* таблиця */}
       <div className="overflow-x-auto rounded-lg border">
         <Table>
           <TableHeader>
@@ -310,6 +454,7 @@ export default function ProductsTable(props: {
         </Table>
       </div>
 
+      {/* пагінація */}
       <div className="mt-3 flex items-center justify-center gap-2 text-sm">
         <Button
           variant="ghost"
@@ -319,12 +464,14 @@ export default function ProductsTable(props: {
           «
         </Button>
         <span>
-          {page} / {totalPages}
+          {page} / {Math.max(1, Math.ceil(total / pageSize))}
         </span>
         <Button
           variant="ghost"
-          onClick={() => applyParam('page', String(Math.min(totalPages, page + 1)))}
-          disabled={page >= totalPages}
+          onClick={() =>
+            applyParam('page', String(Math.min(Math.max(1, Math.ceil(total / pageSize)), page + 1)))
+          }
+          disabled={page >= Math.max(1, Math.ceil(total / pageSize))}
         >
           »
         </Button>

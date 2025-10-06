@@ -14,8 +14,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
-import { Trash2 } from 'lucide-react';
-
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import MediaPicker from './MediaPicker';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
@@ -28,21 +36,15 @@ import {
 } from '@/store/slices/productFormSlice';
 import type { ProductFormState } from '@/store/slices/productFormSlice';
 import type { ProductStatus } from '@prisma/client';
+import { Trash2 } from 'lucide-react';
 
-/* -------------------- helper: upload one file to /api/upload -------------------- */
+/* upload helper */
 async function uploadOne(file: File) {
   const fd = new FormData();
   fd.append('file', file);
   const r = await fetch('/api/upload', { method: 'POST', body: fd });
-  const j = (await r.json()) as
-    | {
-        ok: true;
-        media: { id: string; url: string; alt?: string | null };
-        cloudinary?: { publicId?: string };
-      }
-    | { ok: false; error?: string };
-
-  if ('ok' in j && j.ok && j.media?.id && j.media?.url) {
+  const j = await r.json();
+  if (j?.ok && j?.media?.id && j?.media?.url) {
     return {
       id: j.media.id as string,
       url: j.media.url as string,
@@ -52,74 +54,261 @@ async function uploadOne(file: File) {
   throw new Error('Upload failed');
 }
 
-/* =========================================================================================
-   ProductForm
-========================================================================================= */
+const slugify = (s: string) =>
+  s
+    .toLowerCase()
+    .trim()
+    .replace(/['"]/g, '')
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+
 export default function ProductForm({
   serverProduct,
   brands,
 }: {
-  serverProduct?: Partial<ProductFormState>;
+  serverProduct?: Partial<ProductFormState> & { slug?: string | null };
   brands: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const data = useAppSelector((s) => s.productForm);
 
+  /* UI state */
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(true);
+
+  /* SEO/slug (локально) */
+  const [slug, setSlug] = useState<string>(serverProduct?.slug ?? '');
+
+  /* гидратация из serverProduct */
   useEffect(() => {
     dispatch(hydrateFromServer(serverProduct ?? {}));
+    setSlug(serverProduct?.slug ?? '');
   }, [dispatch, serverProduct?.id]);
 
-  // редактор открыт, когда вариантов нет; иначе закрыт
-  const [editorOpen, setEditorOpen] = useState<boolean>(true);
+  /* редактор вариантов открыт, если вариантов нет */
   useEffect(() => {
     setEditorOpen((data.variants?.length ?? 0) === 0);
   }, [data.variants.length]);
 
-  const save = async () => {
-    if (!data.name || !data.brandId) return;
-
-    const payload = {
-      id: data.id,
-      name: data.name,
-      status: data.status as ProductStatus,
-      brandId: data.brandId,
-      description: data.description ?? null,
-      seoTitle: data.seoTitle ?? null,
-      seoDescription: data.seoDescription ?? null,
-      coverId: data.coverId ?? null,
-      imageIds: data.images.map((m) => m.id),
-      variants: data.variants.map((v, i) => ({
-        id: v.id,
-        label: v.label ?? null,
+  /* ------ корректный dirty: сравниваем с исходником от сервера ------ */
+  const initialComparableRef = useRef<string>('');
+  useEffect(() => {
+    const initialFromServer = JSON.stringify({
+      id: serverProduct?.id ?? null,
+      name: serverProduct?.name ?? '',
+      status: serverProduct?.status ?? 'DRAFT',
+      brandId: serverProduct?.brandId ?? '',
+      description: serverProduct?.description ?? '',
+      seoTitle: serverProduct?.seoTitle ?? serverProduct?.name ?? '',
+      seoDescription:
+        serverProduct?.seoDescription ?? (serverProduct?.description ?? '').slice(0, 160),
+      coverId: serverProduct?.coverId ?? null,
+      images: (serverProduct?.images ?? []).map((m) => m.id),
+      variants: (serverProduct?.variants ?? []).map((v) => ({
+        label: v.label ?? '',
         volumeMl: v.volumeMl ?? null,
-        position: i, // позиция из текущего порядка
-        imageId: v.imageId ?? null,
+        imageId: (v as any).imageId ?? null,
       })),
-    };
-
-    const res = await fetch('/api/products/save', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      slug: serverProduct?.slug ?? (serverProduct?.name ? slugify(serverProduct.name) : ''),
     });
+    initialComparableRef.current = initialFromServer;
+  }, [serverProduct?.id]); // пересчитываем при открытии другой записи
 
-    if (res.ok) router.push('/products');
+  const comparable = useMemo(
+    () =>
+      JSON.stringify({
+        id: data.id ?? null,
+        name: data.name ?? '',
+        status: data.status,
+        brandId: data.brandId ?? '',
+        description: data.description ?? '',
+        // сохраняем фактические поля (если пустые — это осознанный выбор)
+        seoTitle: data.seoTitle ?? '',
+        seoDescription: data.seoDescription ?? '',
+        coverId: data.coverId ?? null,
+        images: data.images.map((m) => m.id),
+        variants: data.variants.map((v) => ({
+          label: v.label ?? '',
+          volumeMl: v.volumeMl ?? null,
+          imageId: v.imageId ?? null,
+        })),
+        slug: slug ?? '',
+      }),
+    [data, slug],
+  );
+
+  const isDirty = comparable !== initialComparableRef.current;
+
+  /* предупреждение при закрытии */
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (!isDirty) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
+
+  /* валидация */
+  const [errors, setErrors] = useState<{
+    name?: string;
+    description?: string;
+    images?: string;
+    slug?: string;
+  }>({});
+  function validate(): boolean {
+    const next: typeof errors = {};
+    if (!data.name?.trim()) next.name = 'Вкажіть назву продукту';
+    if (!data.description?.trim()) next.description = 'Додайте опис продукту';
+    if ((data.images?.length ?? 0) === 0) next.images = 'Додайте принаймні одне зображення';
+    if (slug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) next.slug = 'Латиниця, цифри та дефіс';
+    setErrors(next);
+    return Object.keys(next).length === 0;
+  }
+
+  /* сохранение */
+  const save = async () => {
+    if (saving) return;
+    if (!validate()) return;
+
+    setSaving(true);
+    try {
+      const payload = {
+        id: data.id,
+        name: data.name,
+        status: data.status as ProductStatus,
+        brandId: data.brandId,
+        description: data.description ?? null,
+        // если SEO не заполнили вручную — проставим из name/description
+        seoTitle: (data.seoTitle && data.seoTitle.trim()) || (data.name ?? null),
+        seoDescription:
+          (data.seoDescription && data.seoDescription.trim()) ||
+          (data.description ?? '').slice(0, 160) ||
+          null,
+        coverId: data.coverId ?? null,
+        imageIds: data.images.map((m) => m.id),
+        slug: slug ? slugify(slug) : undefined,
+        variants: data.variants.map((v, i) => ({
+          id: v.id,
+          label: v.label ?? null,
+          volumeMl: v.volumeMl ?? null,
+          position: i,
+          imageId: v.imageId ?? null,
+        })),
+      };
+
+      const res = await fetch('/api/products/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error('Save failed');
+
+      // после успешного сохранения сбрасываем "грязь"
+      initialComparableRef.current = JSON.stringify({
+        ...JSON.parse(comparable),
+      });
+      router.push('/products');
+    } catch {
+      // TODO: toast('Помилка збереження')
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /* удаление */
+  const doDelete = async () => {
+    if (!data.id) return setShowDelete(false);
+    setDeleting(true);
+    try {
+      await fetch('/api/products', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: [data.id] }),
+      });
+      setShowDelete(false);
+      router.push('/products');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  /* превью SEO */
+  const SITE = process.env.NEXT_PUBLIC_SITE_URL || 'https://alcotrade.com.ua';
+  const previewTitle = (data.seoTitle || data.name || '').trim() || 'Мета-заголовок';
+  const previewDesc =
+    (data.seoDescription || data.description || '').trim().slice(0, 160) || 'Опис продукту';
+  const previewSlug =
+    (slug ? slugify(slug) : data.name ? slugify(data.name) : 'posylannya-na-produkt') ||
+    'posylannya-na-produkt';
+
+  /* действия */
+  const resetToServer = () => {
+    dispatch(hydrateFromServer(serverProduct ?? {}));
+    setSlug(serverProduct?.slug ?? '');
+    // пересобрать «базу» и скрыть бар
+    const initialFromServer = JSON.stringify({
+      id: serverProduct?.id ?? null,
+      name: serverProduct?.name ?? '',
+      status: serverProduct?.status ?? 'DRAFT',
+      brandId: serverProduct?.brandId ?? '',
+      description: serverProduct?.description ?? '',
+      seoTitle: serverProduct?.seoTitle ?? serverProduct?.name ?? '',
+      seoDescription:
+        serverProduct?.seoDescription ?? (serverProduct?.description ?? '').slice(0, 160),
+      coverId: serverProduct?.coverId ?? null,
+      images: (serverProduct?.images ?? []).map((m) => m.id),
+      variants: (serverProduct?.variants ?? []).map((v) => ({
+        label: v.label ?? '',
+        volumeMl: v.volumeMl ?? null,
+        imageId: (v as any).imageId ?? null,
+      })),
+      slug: serverProduct?.slug ?? (serverProduct?.name ? slugify(serverProduct.name) : ''),
+    });
+    initialComparableRef.current = initialFromServer;
   };
 
   return (
     <div className="px-4 pt-4 md:px-6">
+      {/* fixed bottom bar */}
+      {isDirty && (
+        <div className="fixed inset-x-0 bottom-2 z-40">
+          <div className="mx-auto w-full max-w-6xl px-4">
+            <div className="bg-card rounded-lg border px-3 py-2 shadow-lg">
+              <div className="flex items-center gap-3">
+                <div className="text-sm">Наявні незбережені зміни</div>
+                <div className="ml-auto flex gap-2">
+                  <Button variant="outline" onClick={resetToServer}>
+                    Відмінити
+                  </Button>
+                  <Button onClick={save} disabled={saving}>
+                    {saving ? 'Збереження…' : 'Зберегти'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">
           {data.id ? 'Редагувати продукт' : 'Новий продукт'}
         </h1>
         <div className="flex gap-2">
-          {data.id && (
-            <Button variant="outline" onClick={() => router.back()}>
+          {isDirty && (
+            <Button variant="outline" onClick={() => router.push('/products')}>
               Відмінити
             </Button>
           )}
-          <Button onClick={save}>Зберегти</Button>
+          <Button onClick={save} disabled={saving}>
+            {saving ? 'Збереження…' : 'Зберегти'}
+          </Button>
         </div>
       </div>
 
@@ -169,7 +358,9 @@ export default function ProductForm({
             <Input
               value={data.name ?? ''}
               onChange={(e) => dispatch(setField({ key: 'name', value: e.target.value }))}
+              aria-invalid={!!errors.name}
             />
+            {errors.name && <p className="text-destructive mt-1 text-xs">{errors.name}</p>}
           </div>
 
           <div>
@@ -178,53 +369,115 @@ export default function ProductForm({
               rows={6}
               value={data.description ?? ''}
               onChange={(e) => dispatch(setField({ key: 'description', value: e.target.value }))}
+              aria-invalid={!!errors.description}
             />
+            {errors.description && (
+              <p className="text-destructive mt-1 text-xs">{errors.description}</p>
+            )}
           </div>
 
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <div className="text-sm font-medium">Варіанти</div>
-              {!editorOpen && data.variants.length > 0 && (
-                <Button size="sm" variant="outline" onClick={() => setEditorOpen(true)}>
-                  Змінити
-                </Button>
-              )}
-            </div>
-            <VariantsSection
-              editorOpen={editorOpen}
-              openEditor={() => setEditorOpen(true)}
-              closeEditor={() => setEditorOpen(false)}
-            />
-          </div>
+          {/* Варіанти */}
+          <VariantsSection
+            editorOpen={editorOpen}
+            openEditor={() => setEditorOpen(true)}
+            closeEditor={() => setEditorOpen(false)}
+          />
 
-          <div className="space-y-2">
+          {/* SEO превью */}
+          <div className="space-y-3">
             <div className="text-sm font-medium">Налаштування в пошукових системах</div>
-            <Input
-              placeholder="Мета-заголовок"
-              value={data.seoTitle ?? ''}
-              onChange={(e) => dispatch(setField({ key: 'seoTitle', value: e.target.value }))}
-            />
-            <Textarea
-              placeholder="Мета-опис"
-              value={data.seoDescription ?? ''}
-              onChange={(e) => dispatch(setField({ key: 'seoDescription', value: e.target.value }))}
-            />
+
+            <div className="bg-muted/30 rounded-lg border p-3">
+              <a
+                href={`${SITE}/uk/products/${previewSlug}`}
+                className="text-primary block text-lg underline-offset-4 hover:underline"
+              >
+                {previewTitle}
+              </a>
+              <div className="text-muted-foreground text-sm">
+                {SITE}/uk/products/<span className="opacity-80">{previewSlug}</span>
+              </div>
+              <div className="mt-2">{previewDesc}</div>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm">Змінити мета-заголовок</label>
+              <Input
+                placeholder="&lt;Назва продукту взята з заголовку&gt;"
+                value={data.seoTitle ?? ''}
+                onChange={(e) => dispatch(setField({ key: 'seoTitle', value: e.target.value }))}
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm">Змінити мета-опис</label>
+              <Textarea
+                rows={3}
+                placeholder="&lt;Опис продукту взятий з опису&gt;"
+                value={data.seoDescription ?? ''}
+                onChange={(e) =>
+                  dispatch(setField({ key: 'seoDescription', value: e.target.value }))
+                }
+              />
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm">Змінити посилання на продукт (slug)</label>
+              <Input
+                placeholder="posylannya-na-produkt"
+                value={slug}
+                onChange={(e) => setSlug(e.target.value)}
+                onBlur={() => setSlug((s) => slugify(s))}
+                aria-invalid={!!errors.slug}
+              />
+              {errors.slug && <p className="text-destructive mt-1 text-xs">{errors.slug}</p>}
+            </div>
           </div>
         </Card>
 
         <Card className="space-y-3 p-4">
           <MediaPicker />
+          {errors.images && <p className="text-destructive text-xs">{errors.images}</p>}
         </Card>
+      </div>
+
+      {/* нижняя панель */}
+      <div className="mt-6 flex items-center justify-end gap-2">
+        {data.id && (
+          <>
+            <Button variant="destructive" onClick={() => setShowDelete(true)} disabled={deleting}>
+              {deleting ? 'Видалення…' : 'Видалити'}
+            </Button>
+            <AlertDialog open={showDelete} onOpenChange={setShowDelete}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Видалити продукт?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Дію неможливо скасувати. Будуть видалені також варіанти.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Скасувати</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={doDelete}
+                    className="bg-destructive hover:bg-destructive/90 text-white"
+                  >
+                    Підтвердити
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </>
+        )}
+        <Button onClick={save} disabled={saving}>
+          {saving ? 'Збереження…' : 'Зберегти'}
+        </Button>
       </div>
     </div>
   );
 }
 
-/* =========================================================================================
-   Внутренние компоненты
-========================================================================================= */
-
-/** Секция вариантов: «пусто» → редактор → список карточек */
+/* === ВАРІАНТИ (как раньше) ============================================ */
 function VariantsSection({
   editorOpen,
   openEditor,
@@ -264,7 +517,6 @@ function VariantsSection({
     );
   }
 
-  // chips + список карточек
   return (
     <div className="rounded-xl border">
       <div className="flex items-center justify-between p-3">
@@ -307,7 +559,6 @@ function VariantsSection({
   );
 }
 
-/** Редактор опции «как в Shopify»: одно имя + токены значений (Enter или , чтобы добавить) */
 function OptionEditor({
   defaultName = 'Обʼєм',
   defaultValues = [],
@@ -317,25 +568,19 @@ function OptionEditor({
   defaultName?: string;
   defaultValues?: string[];
   onCancel: () => void;
-  onSave: (optionName: string, values: string[]) => void;
+  onSave: (name: string, values: string[]) => void;
 }) {
   const [name, setName] = useState(defaultName);
   const [tokens, setTokens] = useState<string[]>(
     defaultValues.map((v) => v.trim()).filter(Boolean),
   );
   const [input, setInput] = useState('');
-
   const addToken = (raw: string) => {
-    const val = raw.trim();
-    if (!val) return;
-    if (tokens.includes(val)) return;
-    setTokens((t) => [...t, val]);
+    const v = raw.trim();
+    if (!v) return;
+    if (!tokens.includes(v)) setTokens((t) => [...t, v]);
   };
-
-  const removeToken = (i: number) => {
-    setTokens((t) => t.filter((_, idx) => idx !== i));
-  };
-
+  const removeToken = (i: number) => setTokens((t) => t.filter((_, idx) => idx !== i));
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
@@ -343,28 +588,21 @@ function OptionEditor({
       setInput('');
     }
   };
-
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    const text = e.clipboardData.getData('text');
-    if (!text) return;
-    const parts = text
-      .split(/,|\n|;/g)
+    const parts = e.clipboardData
+      .getData('text')
+      .split(/[,\n;]/g)
       .map((s) => s.trim())
       .filter(Boolean);
     if (parts.length) {
       e.preventDefault();
-      setTokens((t) => {
-        const next = [...t];
-        for (const p of parts) if (!next.includes(p)) next.push(p);
-        return next;
-      });
+      setTokens((t) => Array.from(new Set([...t, ...parts])));
     }
   };
-
   const save = () => {
-    const filtered = tokens.map((v) => v.trim()).filter(Boolean);
-    if (filtered.length === 0) return onCancel();
-    onSave(name.trim() || 'Варіант', filtered);
+    const values = tokens.map((v) => v.trim()).filter(Boolean);
+    if (!values.length) return onCancel();
+    onSave(name.trim() || 'Варіант', values);
   };
 
   return (
@@ -376,7 +614,6 @@ function OptionEditor({
         value={name}
         onChange={(e) => setName(e.target.value)}
       />
-
       <div className="mb-2 text-sm font-medium">Значення варіанту</div>
       <div className="rounded-lg border p-2">
         <div className="mb-2 flex flex-wrap gap-2">
@@ -405,7 +642,7 @@ function OptionEditor({
           onPaste={handlePaste}
         />
         <div className="text-muted-foreground mt-1 text-xs">
-          Підтримується вставка переліку через кому або з нового рядка.
+          Підтримується вставка через кому або новий рядок.
         </div>
       </div>
 
@@ -419,7 +656,6 @@ function OptionEditor({
   );
 }
 
-/** Карточка варианта (зображення + назва продукту + значення) */
 function VariantCard({
   idx,
   productName,
@@ -439,7 +675,6 @@ function VariantCard({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const pick = () => fileRef.current?.click();
-
   return (
     <div className="rounded-lg border p-3">
       <div className="mb-2 flex items-center justify-between">
@@ -451,7 +686,6 @@ function VariantCard({
             title="додати"
           >
             {imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
               <img src={imageUrl} alt="" className="h-full w-full object-cover" />
             ) : (
               <span className="text-2xl">＋</span>
@@ -462,9 +696,8 @@ function VariantCard({
             <div className="text-muted-foreground text-sm">{valueLabel}</div>
           </div>
         </div>
-
         <Button variant="ghost" onClick={onRemove} title="Видалити">
-          ×
+          <Trash2 className="h-4 w-4" />
         </Button>
       </div>
 
@@ -480,7 +713,6 @@ function VariantCard({
           if (fileRef.current) fileRef.current.value = '';
         }}
       />
-
       {imageUrl && (
         <div className="flex items-center gap-2">
           <Button size="sm" variant="outline" onClick={onRemoveImage}>
