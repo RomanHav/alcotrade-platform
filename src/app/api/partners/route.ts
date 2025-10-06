@@ -11,7 +11,7 @@ export async function GET() {
     id: p.id,
     name: p.name,
     link: p.link,
-    image: (p as any).logo?.url ?? null,
+    image: p.logo?.url ?? null,
   }));
 
   return NextResponse.json(data);
@@ -20,42 +20,50 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { name, link, image } = body as {
-      name: string;
+    const { name, link, image } = (body ?? {}) as {
+      name?: string;
       link?: string | null;
       image?: string | null;
     };
 
-    if (!name || typeof name !== 'string') {
+    const safeName = typeof name === 'string' ? name.trim() : '';
+    if (!safeName) {
       return NextResponse.json({ error: 'name is required' }, { status: 400 });
     }
 
+    const safeLink = typeof link === 'string' && link.trim().length > 0 ? link.trim() : null;
+    const safeImage = typeof image === 'string' && image.trim().length > 0 ? image.trim() : null;
+
     let logoId: string | null = null;
-    if (image) {
+    if (safeImage) {
       const asset = await prisma.mediaAsset.create({
-        data: { url: image },
+        data: { url: safeImage },
       });
       logoId = asset.id;
     }
 
     const created = await prisma.partner.create({
       data: {
-        name,
-        link: link ?? null,
+        name: safeName,
+        link: safeLink,
         logoId,
       },
       include: { logo: true },
     });
 
-    const dto = {
-      id: created.id,
-      name: created.name,
-      link: created.link,
-      image: (created as any).logo?.url ?? null,
-    };
-
-    return NextResponse.json(dto, { status: 201 });
+    return NextResponse.json(
+      {
+        id: created.id,
+        name: created.name,
+        link: created.link,
+        image: created.logo?.url ?? null,
+      },
+      { status: 201 },
+    );
   } catch (e: any) {
+    if (e?.code === 'P2002') {
+      return NextResponse.json({ error: 'Link must be unique' }, { status: 409 });
+    }
     console.error('Create partner error:', e);
     return NextResponse.json({ error: 'Create failed' }, { status: 500 });
   }

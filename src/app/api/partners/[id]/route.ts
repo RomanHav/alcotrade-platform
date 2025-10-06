@@ -5,21 +5,32 @@ import { extractCloudinaryPublicId } from '@/lib/cloudinary-publicid';
 
 cloudinary.config({ secure: true });
 
-type Body = { name?: string; link?: string | null; image?: string | null };
-
-export async function PATCH(req: Request, ctx: unknown) {
+export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   try {
-    const { id } = (ctx as { params: { id: string } }).params;
+    const { id } = params;
+    const body = (await req.json()) as {
+      name?: string;
+      link?: string | null;
+      image?: string | null;
+    };
 
-    const body = (await req.json()) as Body;
+    const prev = await prisma.partner.findUnique({
+      where: { id },
+      include: { logo: true },
+    });
 
     const updates: Record<string, unknown> = {};
     if (typeof body.name === 'string') updates.name = body.name;
     if (typeof body.link !== 'undefined') updates.link = body.link;
 
-    if (typeof body.image !== 'undefined') {
-      if (body.image) {
-        const asset = await prisma.mediaAsset.create({ data: { url: body.image } });
+    const nextImage =
+      typeof body.image === 'string' && body.image.trim().length > 0
+        ? body.image.trim()
+        : (body.image ?? undefined);
+
+    if (typeof nextImage !== 'undefined') {
+      if (nextImage) {
+        const asset = await prisma.mediaAsset.create({ data: { url: nextImage } });
         updates.logoId = asset.id;
       } else {
         updates.logoId = null;
@@ -31,6 +42,30 @@ export async function PATCH(req: Request, ctx: unknown) {
       data: updates,
       include: { logo: true },
     });
+
+    if (typeof nextImage !== 'undefined') {
+      const oldUrl = prev?.logo?.url ?? null;
+      const newUrl = updated.logo?.url ?? null;
+
+      const oldPublicId = extractCloudinaryPublicId(oldUrl);
+      const newPublicId = extractCloudinaryPublicId(newUrl);
+
+      if (oldPublicId && oldPublicId !== newPublicId) {
+        try {
+          await cloudinary.uploader.destroy(oldPublicId, { invalidate: true });
+        } catch (e) {
+          console.warn('Cloudinary destroy failed (old logo):', e);
+        }
+      }
+
+      if (prev?.logoId && prev.logoId !== updated.logoId) {
+        try {
+          await prisma.mediaAsset.delete({ where: { id: prev.logoId } });
+        } catch {
+          /* ignore */
+        }
+      }
+    }
 
     return NextResponse.json({
       id: updated.id,
@@ -44,9 +79,9 @@ export async function PATCH(req: Request, ctx: unknown) {
   }
 }
 
-export async function DELETE(_req: Request, ctx: unknown) {
+export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
   try {
-    const { id } = (ctx as { params: { id: string } }).params;
+    const { id } = params;
 
     const partner = await prisma.partner.findUnique({
       where: { id },

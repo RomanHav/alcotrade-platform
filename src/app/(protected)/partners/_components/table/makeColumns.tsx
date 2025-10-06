@@ -42,12 +42,10 @@ export function makeColumns(opts: EditOptions): ColumnDef<Partner>[] {
 
         const handlePick = async (file: File) => {
           try {
-            if (!onUploadImage) return;
-
             const fromUrl = extractCloudinaryPublicId(currentUrl);
-
             const publicId = fromUrl ?? `Alcotrade/partners/${r.id}`;
 
+            if (!onUploadImage) return;
             const { url } = await onUploadImage(file, { publicId });
             onDraftChange(r.id, 'image', url);
           } catch (e) {
@@ -122,7 +120,7 @@ export function makeColumns(opts: EditOptions): ColumnDef<Partner>[] {
         const draft = drafts[r.id] ?? {};
         const value = (isEditing ? draft.link : r.link) ?? '';
         return (
-          <div className="w-full max-w-full">
+          <div className="w/full max-w-full">
             <LinkCell
               value={value}
               editing={isEditing}

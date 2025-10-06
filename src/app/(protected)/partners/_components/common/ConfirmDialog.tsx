@@ -13,7 +13,6 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 
-
 export default function ConfirmDialog({
   trigger,
   title,
@@ -50,13 +49,13 @@ export default function ConfirmDialog({
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
-          {description ? (
-            <AlertDialogDescription>{description}</AlertDialogDescription>
-          ) : null}
+          {description ? <AlertDialogDescription>{description}</AlertDialogDescription> : null}
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={loading}>{cancelText}</AlertDialogCancel>
-          <AlertDialogAction onClick={handleConfirm} disabled={loading}>
+          <AlertDialogCancel className="cursor-pointer" disabled={loading}>
+            {cancelText}
+          </AlertDialogCancel>
+          <AlertDialogAction className="cursor-pointer" onClick={handleConfirm} disabled={loading}>
             {loading ? 'Видаляю…' : confirmText}
           </AlertDialogAction>
         </AlertDialogFooter>

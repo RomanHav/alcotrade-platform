@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
 
+export const runtime = 'nodejs';
+
 cloudinary.config({ secure: true });
 
 function splitPublicId(input: string | null): { folder: string; name: string } {
@@ -19,8 +21,24 @@ function splitPublicId(input: string | null): { folder: string; name: string } {
   return { folder, name };
 }
 
+function ensureCloudinaryCreds() {
+  const hasUrl = !!process.env.CLOUDINARY_URL;
+  const hasTriple =
+    !!process.env.CLOUDINARY_CLOUD_NAME &&
+    !!process.env.CLOUDINARY_API_KEY &&
+    !!process.env.CLOUDINARY_API_SECRET;
+
+  if (!hasUrl && !hasTriple) {
+    throw new Error(
+      'Cloudinary credentials are missing. Set CLOUDINARY_URL or CLOUDINARY_CLOUD_NAME / API_KEY / API_SECRET.',
+    );
+  }
+}
+
 export async function POST(req: Request) {
   try {
+    ensureCloudinaryCreds();
+
     const form = await req.formData();
     const file = form.get('file') as File | null;
     const publicIdRaw = (form.get('publicId') as string | null) ?? null;
@@ -30,20 +48,17 @@ export async function POST(req: Request) {
     }
 
     const { folder, name } = splitPublicId(publicIdRaw);
-    const buffer = Buffer.from(await file.arrayBuffer());
 
-    const uploaded = await new Promise<any>((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        {
-          folder,
-          public_id: name,
-          overwrite: true,
-          invalidate: true,
-          resource_type: 'image',
-        },
-        (err, result) => (err ? reject(err) : resolve(result)),
-      );
-      stream.end(buffer);
+    const arrayBuffer = await file.arrayBuffer();
+    const base64 = Buffer.from(arrayBuffer).toString('base64');
+    const dataUri = `data:${file.type || 'image/png'};base64,${base64}`;
+
+    const uploaded = await cloudinary.uploader.upload(dataUri, {
+      folder,
+      public_id: name,
+      overwrite: true,
+      invalidate: true,
+      resource_type: 'image',
     });
 
     return NextResponse.json({
@@ -54,8 +69,12 @@ export async function POST(req: Request) {
       format: uploaded.format,
       version: uploaded.version,
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error('Cloudinary upload error:', e);
-    return NextResponse.json({ error: 'Upload failed' }, { status: 500 });
+    const isDev = process.env.NODE_ENV !== 'production';
+    return NextResponse.json(
+      { error: 'Upload failed', detail: isDev ? String(e?.message ?? e) : undefined },
+      { status: 500 },
+    );
   }
 }
