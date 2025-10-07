@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,21 +25,21 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Trash2 } from 'lucide-react';
+
 import MediaPicker from './MediaPicker';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
   hydrateFromServer,
   setField,
   removeVariant,
-  setVariantsFromValues,
   setVariantImage,
   clearVariantImage,
 } from '@/store/slices/productFormSlice';
 import type { ProductFormState } from '@/store/slices/productFormSlice';
 import type { ProductStatus } from '@prisma/client';
-import { Trash2 } from 'lucide-react';
 
-/* upload helper */
+/* -------------------------------- upload helper -------------------------------- */
 async function uploadOne(file: File) {
   const fd = new FormData();
   fd.append('file', file);
@@ -54,6 +55,7 @@ async function uploadOne(file: File) {
   throw new Error('Upload failed');
 }
 
+/* -------------------------------- slug helper -------------------------------- */
 const slugify = (s: string) =>
   s
     .toLowerCase()
@@ -63,6 +65,19 @@ const slugify = (s: string) =>
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-');
 
+/* ------------------------------- units for volume ------------------------------ */
+type UnitKey = 'ml' | 'l' | 'cl';
+const UNITS: Record<UnitKey, { label: string; factor: number }> = {
+  ml: { label: 'мл', factor: 1 },
+  cl: { label: 'cl', factor: 10 },
+  l: { label: 'л', factor: 1000 },
+};
+const fmtLabel = (value: number, unit: UnitKey) => `${value} ${UNITS[unit].label}`;
+const toMl = (value: number, unit: UnitKey) => value * UNITS[unit].factor;
+
+/* =========================================================================================
+   ProductForm
+========================================================================================= */
 export default function ProductForm({
   serverProduct,
   brands,
@@ -74,27 +89,27 @@ export default function ProductForm({
   const dispatch = useAppDispatch();
   const data = useAppSelector((s) => s.productForm);
 
-  /* UI state */
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
   const [editorOpen, setEditorOpen] = useState(true);
-
-  /* SEO/slug (локально) */
   const [slug, setSlug] = useState<string>(serverProduct?.slug ?? '');
-
-  /* гидратация из serverProduct */
+  const slugTouchedRef = useRef(false);
+  useEffect(() => {
+    slugTouchedRef.current = false;
+  }, [serverProduct?.id]);
+  /* ----------------------- hydrate + open editor only when empty ---------------------- */
   useEffect(() => {
     dispatch(hydrateFromServer(serverProduct ?? {}));
+    slugTouchedRef.current = false;
     setSlug(serverProduct?.slug ?? '');
   }, [dispatch, serverProduct?.id]);
 
-  /* редактор вариантов открыт, если вариантов нет */
   useEffect(() => {
     setEditorOpen((data.variants?.length ?? 0) === 0);
   }, [data.variants.length]);
 
-  /* ------ корректный dirty: сравниваем с исходником от сервера ------ */
+  /* ------------------------------ dirty-state snapshot ------------------------------ */
   const initialComparableRef = useRef<string>('');
   useEffect(() => {
     const initialFromServer = JSON.stringify({
@@ -116,7 +131,7 @@ export default function ProductForm({
       slug: serverProduct?.slug ?? (serverProduct?.name ? slugify(serverProduct.name) : ''),
     });
     initialComparableRef.current = initialFromServer;
-  }, [serverProduct?.id]); // пересчитываем при открытии другой записи
+  }, [serverProduct?.id]);
 
   const comparable = useMemo(
     () =>
@@ -126,7 +141,6 @@ export default function ProductForm({
         status: data.status,
         brandId: data.brandId ?? '',
         description: data.description ?? '',
-        // сохраняем фактические поля (если пустые — это осознанный выбор)
         seoTitle: data.seoTitle ?? '',
         seoDescription: data.seoDescription ?? '',
         coverId: data.coverId ?? null,
@@ -140,10 +154,9 @@ export default function ProductForm({
       }),
     [data, slug],
   );
-
   const isDirty = comparable !== initialComparableRef.current;
 
-  /* предупреждение при закрытии */
+  /* ----------------------- warn on close if dirty (edit only) ----------------------- */
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       if (!isDirty) return;
@@ -154,26 +167,29 @@ export default function ProductForm({
     return () => window.removeEventListener('beforeunload', handler);
   }, [isDirty]);
 
-  /* валидация */
+  /* ---------------------------------- validation ---------------------------------- */
   const [errors, setErrors] = useState<{
     name?: string;
     description?: string;
     images?: string;
     slug?: string;
+    brandId?: string;
   }>({});
+
   function validate(): boolean {
     const next: typeof errors = {};
     if (!data.name?.trim()) next.name = 'Вкажіть назву продукту';
     if (!data.description?.trim()) next.description = 'Додайте опис продукту';
+    if (!data.brandId) next.brandId = 'Оберіть бренд';
     if ((data.images?.length ?? 0) === 0) next.images = 'Додайте принаймні одне зображення';
     if (slug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) next.slug = 'Латиниця, цифри та дефіс';
     setErrors(next);
     return Object.keys(next).length === 0;
   }
 
-  /* сохранение */
+  /* ------------------------------------- save ------------------------------------- */
   const save = async () => {
-    if (saving) return;
+    if (saving || !isDirty) return;
     if (!validate()) return;
 
     setSaving(true);
@@ -184,7 +200,6 @@ export default function ProductForm({
         status: data.status as ProductStatus,
         brandId: data.brandId,
         description: data.description ?? null,
-        // если SEO не заполнили вручную — проставим из name/description
         seoTitle: (data.seoTitle && data.seoTitle.trim()) || (data.name ?? null),
         seoDescription:
           (data.seoDescription && data.seoDescription.trim()) ||
@@ -192,7 +207,7 @@ export default function ProductForm({
           null,
         coverId: data.coverId ?? null,
         imageIds: data.images.map((m) => m.id),
-        slug: slug ? slugify(slug) : undefined,
+        slug: slugify(slug || data.name || ''),
         variants: data.variants.map((v, i) => ({
           id: v.id,
           label: v.label ?? null,
@@ -207,21 +222,24 @@ export default function ProductForm({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+      if (res.status === 409) {
+        setErrors((prev) => ({ ...prev, slug: 'Це посилання вже зайняте' }));
+        setSaving(false);
+        return;
+      }
       if (!res.ok) throw new Error('Save failed');
 
-      // после успешного сохранения сбрасываем "грязь"
-      initialComparableRef.current = JSON.stringify({
-        ...JSON.parse(comparable),
-      });
+      // фиксируем базу, чтобы бар спрятался
+      initialComparableRef.current = JSON.stringify({ ...JSON.parse(comparable) });
       router.push('/products');
     } catch {
-      // TODO: toast('Помилка збереження')
+      // TODO: показать toast об ошибке
     } finally {
       setSaving(false);
     }
   };
 
-  /* удаление */
+  /* ------------------------------------ delete ------------------------------------ */
   const doDelete = async () => {
     if (!data.id) return setShowDelete(false);
     setDeleting(true);
@@ -238,7 +256,7 @@ export default function ProductForm({
     }
   };
 
-  /* превью SEO */
+  /* ------------------------------ SEO preview values ------------------------------ */
   const SITE = process.env.NEXT_PUBLIC_SITE_URL || 'https://alcotrade.com.ua';
   const previewTitle = (data.seoTitle || data.name || '').trim() || 'Мета-заголовок';
   const previewDesc =
@@ -247,11 +265,10 @@ export default function ProductForm({
     (slug ? slugify(slug) : data.name ? slugify(data.name) : 'posylannya-na-produkt') ||
     'posylannya-na-produkt';
 
-  /* действия */
+  /* -------------------------------- top actions -------------------------------- */
   const resetToServer = () => {
     dispatch(hydrateFromServer(serverProduct ?? {}));
     setSlug(serverProduct?.slug ?? '');
-    // пересобрать «базу» и скрыть бар
     const initialFromServer = JSON.stringify({
       id: serverProduct?.id ?? null,
       name: serverProduct?.name ?? '',
@@ -275,9 +292,9 @@ export default function ProductForm({
 
   return (
     <div className="px-4 pt-4 md:px-6">
-      {/* fixed bottom bar */}
+      {/* sticky save bar */}
       {isDirty && (
-        <div className="fixed inset-x-0 bottom-2 z-40">
+        <div className="fixed inset-x-0 bottom-5 z-40">
           <div className="mx-auto w-full max-w-6xl px-4">
             <div className="bg-card rounded-lg border px-3 py-2 shadow-lg">
               <div className="flex items-center gap-3">
@@ -286,7 +303,7 @@ export default function ProductForm({
                   <Button variant="outline" onClick={resetToServer}>
                     Відмінити
                   </Button>
-                  <Button onClick={save} disabled={saving}>
+                  <Button onClick={save} disabled={saving || !isDirty}>
                     {saving ? 'Збереження…' : 'Зберегти'}
                   </Button>
                 </div>
@@ -296,17 +313,26 @@ export default function ProductForm({
         </div>
       )}
 
+      {/* breadcrumbs */}
+      <div className="mb-1 text-sm">
+        <Link href="/products" className="underline-offset-4 hover:underline">
+          Продукти
+        </Link>{' '}
+        <span className="opacity-60">›</span>{' '}
+        <span className="opacity-80">{data.name?.trim() || 'Назва продукту'}</span>
+      </div>
+
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">
           {data.id ? 'Редагувати продукт' : 'Новий продукт'}
         </h1>
         <div className="flex gap-2">
           {isDirty && (
-            <Button variant="outline" onClick={() => router.push('/products')}>
+            <Button variant="outline" onClick={resetToServer}>
               Відмінити
             </Button>
           )}
-          <Button onClick={save} disabled={saving}>
+          <Button onClick={save} disabled={saving || !isDirty}>
             {saving ? 'Збереження…' : 'Зберегти'}
           </Button>
         </div>
@@ -337,9 +363,12 @@ export default function ProductForm({
               <label className="mb-1 block text-sm">Бренд</label>
               <Select
                 value={data.brandId}
-                onValueChange={(v) => dispatch(setField({ key: 'brandId', value: v }))}
+                onValueChange={(v) => {
+                  dispatch(setField({ key: 'brandId', value: v }));
+                  if (errors.brandId) setErrors((e) => ({ ...e, brandId: undefined }));
+                }}
               >
-                <SelectTrigger>
+                <SelectTrigger aria-invalid={!!errors.brandId}>
                   <SelectValue placeholder="Оберіть бренд" />
                 </SelectTrigger>
                 <SelectContent>
@@ -350,6 +379,7 @@ export default function ProductForm({
                   ))}
                 </SelectContent>
               </Select>
+              {errors.brandId && <p className="text-destructive mt-1 text-xs">{errors.brandId}</p>}
             </div>
           </div>
 
@@ -357,7 +387,11 @@ export default function ProductForm({
             <label className="mb-1 block text-sm">Заголовок</label>
             <Input
               value={data.name ?? ''}
-              onChange={(e) => dispatch(setField({ key: 'name', value: e.target.value }))}
+              onChange={(e) => {
+                const value = e.target.value;
+                dispatch(setField({ key: 'name', value }));
+                if (!slugTouchedRef.current) setSlug(slugify(value));
+              }}
               aria-invalid={!!errors.name}
             />
             {errors.name && <p className="text-destructive mt-1 text-xs">{errors.name}</p>}
@@ -383,7 +417,7 @@ export default function ProductForm({
             closeEditor={() => setEditorOpen(false)}
           />
 
-          {/* SEO превью */}
+          {/* SEO превʼю */}
           <div className="space-y-3">
             <div className="text-sm font-medium">Налаштування в пошукових системах</div>
 
@@ -426,7 +460,10 @@ export default function ProductForm({
               <Input
                 placeholder="posylannya-na-produkt"
                 value={slug}
-                onChange={(e) => setSlug(e.target.value)}
+                onChange={(e) => {
+                  slugTouchedRef.current = true;
+                  setSlug(e.target.value);
+                }}
                 onBlur={() => setSlug((s) => slugify(s))}
                 aria-invalid={!!errors.slug}
               />
@@ -441,7 +478,7 @@ export default function ProductForm({
         </Card>
       </div>
 
-      {/* нижняя панель */}
+      {/* нижние действия */}
       <div className="mt-6 flex items-center justify-end gap-2">
         {data.id && (
           <>
@@ -469,7 +506,7 @@ export default function ProductForm({
             </AlertDialog>
           </>
         )}
-        <Button onClick={save} disabled={saving}>
+        <Button onClick={save} disabled={saving || !isDirty}>
           {saving ? 'Збереження…' : 'Зберегти'}
         </Button>
       </div>
@@ -477,7 +514,10 @@ export default function ProductForm({
   );
 }
 
-/* === ВАРІАНТИ (как раньше) ============================================ */
+/* =========================================================================================
+   Variants
+========================================================================================= */
+
 function VariantsSection({
   editorOpen,
   openEditor,
@@ -504,13 +544,56 @@ function VariantsSection({
   }
 
   if (editorOpen) {
+    // подготовим дефолтные строки из существующих variants
+    const defaults =
+      data.variants.length > 0
+        ? data.variants.map((v) => {
+            // пытаемся восстановить по volumeMl, иначе оставим ml
+            const ml = v.volumeMl ?? null;
+            if (ml && ml % 1000 === 0) return { value: String(ml / 1000), unit: 'l' as UnitKey };
+            if (ml && ml % 10 === 0) return { value: String(ml / 10), unit: 'cl' as UnitKey };
+            return { value: String(ml ?? ''), unit: 'ml' as UnitKey };
+          })
+        : [
+            { value: '', unit: 'ml' as UnitKey },
+            { value: '', unit: 'ml' as UnitKey },
+          ];
+
     return (
       <OptionEditor
         defaultName="Обʼєм"
-        defaultValues={data.variants.map((v) => v.label ?? '').filter(Boolean)}
+        defaultRows={defaults}
         onCancel={closeEditor}
-        onSave={(name, values) => {
-          dispatch(setVariantsFromValues({ optionName: name, values }));
+        onSave={(name, rows) => {
+          // нормализуем -> массив {label, volumeMl}
+          const items = rows
+            .map(({ value, unit }) => {
+              const n = parseInt(String(value || '').replace(/[^\d]/g, ''), 10);
+              if (!Number.isFinite(n) || n <= 0) return null;
+              return { label: fmtLabel(n, unit), volumeMl: toMl(n, unit) };
+            })
+            .filter(Boolean) as { label: string; volumeMl: number }[];
+
+          if (items.length === 0) return closeEditor();
+
+          // переносим данные старых вариантов (id, images) если совпали по volumeMl или label
+          const prev = data.variants;
+          const next = items.map((it, i) => {
+            const found =
+              prev.find((p) => (p.volumeMl ?? null) === it.volumeMl) ||
+              prev.find((p) => (p.label ?? '') === it.label);
+            return {
+              id: found?.id,
+              position: i,
+              label: it.label,
+              volumeMl: it.volumeMl,
+              imageId: found?.imageId ?? null,
+              imageUrl: found?.imageUrl ?? null,
+              imagePublicId: found?.imagePublicId ?? null,
+            };
+          });
+
+          dispatch(setField({ key: 'variants', value: next as any }));
           closeEditor();
         }}
       />
@@ -559,51 +642,40 @@ function VariantsSection({
   );
 }
 
+/** Редактор опції: строки «целое число + единица» */
 function OptionEditor({
   defaultName = 'Обʼєм',
-  defaultValues = [],
+  defaultRows = [{ value: '', unit: 'ml' as UnitKey }],
   onCancel,
   onSave,
 }: {
   defaultName?: string;
-  defaultValues?: string[];
+  defaultRows?: { value: string | number; unit: UnitKey }[];
   onCancel: () => void;
-  onSave: (name: string, values: string[]) => void;
+  onSave: (name: string, rows: { value: string | number; unit: UnitKey }[]) => void;
 }) {
   const [name, setName] = useState(defaultName);
-  const [tokens, setTokens] = useState<string[]>(
-    defaultValues.map((v) => v.trim()).filter(Boolean),
+  const [rows, setRows] = useState<{ value: string; unit: UnitKey }[]>(
+    defaultRows.map((r) => ({ value: String(r.value ?? ''), unit: r.unit })),
   );
-  const [input, setInput] = useState('');
-  const addToken = (raw: string) => {
-    const v = raw.trim();
-    if (!v) return;
-    if (!tokens.includes(v)) setTokens((t) => [...t, v]);
+
+  const setRow = (i: number, patch: Partial<{ value: string; unit: UnitKey }>) => {
+    setRows((rs) => {
+      const next = [...rs];
+      next[i] = { ...next[i], ...patch };
+      return next;
+    });
   };
-  const removeToken = (i: number) => setTokens((t) => t.filter((_, idx) => idx !== i));
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault();
-      addToken(input);
-      setInput('');
-    }
+  const addRow = () => setRows((rs) => [...rs, { value: '', unit: 'ml' }]);
+  const removeRow = (i: number) => setRows((rs) => rs.filter((_, idx) => idx !== i));
+
+  const onValueChange = (i: number, raw: string) => {
+    // только целые числа
+    const cleaned = raw.replace(/[^\d]/g, '');
+    setRow(i, { value: cleaned });
   };
-  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    const parts = e.clipboardData
-      .getData('text')
-      .split(/[,\n;]/g)
-      .map((s) => s.trim())
-      .filter(Boolean);
-    if (parts.length) {
-      e.preventDefault();
-      setTokens((t) => Array.from(new Set([...t, ...parts])));
-    }
-  };
-  const save = () => {
-    const values = tokens.map((v) => v.trim()).filter(Boolean);
-    if (!values.length) return onCancel();
-    onSave(name.trim() || 'Варіант', values);
-  };
+
+  const save = () => onSave(name.trim() || 'Варіант', rows);
 
   return (
     <div className="bg-muted/40 rounded-xl border p-3">
@@ -614,36 +686,38 @@ function OptionEditor({
         value={name}
         onChange={(e) => setName(e.target.value)}
       />
+
       <div className="mb-2 text-sm font-medium">Значення варіанту</div>
-      <div className="rounded-lg border p-2">
-        <div className="mb-2 flex flex-wrap gap-2">
-          {tokens.map((t, i) => (
-            <span
-              key={`${t}-${i}`}
-              className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs"
-            >
-              {t}
-              <button
-                type="button"
-                onClick={() => removeToken(i)}
-                className="text-muted-foreground hover:text-foreground ml-1"
-                title="Видалити"
-              >
-                ×
-              </button>
-            </span>
-          ))}
-        </div>
-        <Input
-          placeholder="Введіть значення і натисніть Enter або ,"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onPaste={handlePaste}
-        />
-        <div className="text-muted-foreground mt-1 text-xs">
-          Підтримується вставка через кому або новий рядок.
-        </div>
+      <div className="space-y-2">
+        {rows.map((r, i) => (
+          <div key={i} className="flex gap-2">
+            <Input
+              inputMode="numeric"
+              pattern="\d*"
+              placeholder="число"
+              value={r.value}
+              onChange={(e) => onValueChange(i, e.target.value)}
+              className="w-32"
+            />
+            <Select value={r.unit} onValueChange={(v: UnitKey) => setRow(i, { unit: v })}>
+              <SelectTrigger className="w-28">
+                <SelectValue placeholder="од." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ml">мл</SelectItem>
+                <SelectItem value="cl">cl</SelectItem>
+                <SelectItem value="l">л</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Button type="button" variant="ghost" onClick={() => removeRow(i)} title="Видалити">
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        ))}
+        <Button type="button" variant="outline" onClick={addRow}>
+          Додати значення
+        </Button>
       </div>
 
       <div className="mt-3 flex gap-2">
@@ -656,6 +730,7 @@ function OptionEditor({
   );
 }
 
+/** Карточка варианта (изображення + назва продукту + значення) */
 function VariantCard({
   idx,
   productName,
@@ -675,6 +750,7 @@ function VariantCard({
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const pick = () => fileRef.current?.click();
+
   return (
     <div className="rounded-lg border p-3">
       <div className="mb-2 flex items-center justify-between">
@@ -686,6 +762,7 @@ function VariantCard({
             title="додати"
           >
             {imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img src={imageUrl} alt="" className="h-full w-full object-cover" />
             ) : (
               <span className="text-2xl">＋</span>
@@ -696,6 +773,7 @@ function VariantCard({
             <div className="text-muted-foreground text-sm">{valueLabel}</div>
           </div>
         </div>
+
         <Button variant="ghost" onClick={onRemove} title="Видалити">
           <Trash2 className="h-4 w-4" />
         </Button>
