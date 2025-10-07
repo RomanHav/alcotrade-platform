@@ -6,6 +6,7 @@ import Sidebar from '@/components/layout/Sidebar';
 import { prisma } from '@/lib/prisma';
 import type { Role } from '@prisma/client';
 import Providers from '@/app/(protected)/providers';
+import { Toaster } from '@/components/ui/sonner';
 
 const DEFAULT_AVATAR = process.env.NEXT_PUBLIC_DEFAULT_USER_IMAGE ?? '/avatar.jpg';
 
@@ -36,6 +37,7 @@ export default async function ProtectedLayout({ children }: { children: ReactNod
           <main className="flex-1 p-4">{children}</main>
         </div>
       </div>
+      <Toaster />
     </Providers>
   );
 }

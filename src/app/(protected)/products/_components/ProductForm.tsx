@@ -4,6 +4,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -98,7 +99,8 @@ export default function ProductForm({
   useEffect(() => {
     slugTouchedRef.current = false;
   }, [serverProduct?.id]);
-  /* ----------------------- hydrate + open editor only when empty ---------------------- */
+
+  /* hydrate + open editor only when empty */
   useEffect(() => {
     dispatch(hydrateFromServer(serverProduct ?? {}));
     slugTouchedRef.current = false;
@@ -109,7 +111,7 @@ export default function ProductForm({
     setEditorOpen((data.variants?.length ?? 0) === 0);
   }, [data.variants.length]);
 
-  /* ------------------------------ dirty-state snapshot ------------------------------ */
+  /* dirty-state snapshot */
   const initialComparableRef = useRef<string>('');
   useEffect(() => {
     const initialFromServer = JSON.stringify({
@@ -156,7 +158,7 @@ export default function ProductForm({
   );
   const isDirty = comparable !== initialComparableRef.current;
 
-  /* ----------------------- warn on close if dirty (edit only) ----------------------- */
+  /* warn on close if dirty (edit only) */
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       if (!isDirty) return;
@@ -167,7 +169,7 @@ export default function ProductForm({
     return () => window.removeEventListener('beforeunload', handler);
   }, [isDirty]);
 
-  /* ---------------------------------- validation ---------------------------------- */
+  /* validation */
   const [errors, setErrors] = useState<{
     name?: string;
     description?: string;
@@ -183,11 +185,18 @@ export default function ProductForm({
     if (!data.brandId) next.brandId = 'Оберіть бренд';
     if ((data.images?.length ?? 0) === 0) next.images = 'Додайте принаймні одне зображення';
     if (slug && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)) next.slug = 'Латиниця, цифри та дефіс';
+
     setErrors(next);
+
+    const firstError =
+      next.brandId || next.name || next.description || next.images || next.slug || null;
+    if (firstError) {
+      toast.error('Перевірте форму', { description: firstError });
+    }
     return Object.keys(next).length === 0;
   }
 
-  /* ------------------------------------- save ------------------------------------- */
+  /* save */
   const save = async () => {
     if (saving || !isDirty) return;
     if (!validate()) return;
@@ -222,41 +231,49 @@ export default function ProductForm({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
+
       if (res.status === 409) {
         setErrors((prev) => ({ ...prev, slug: 'Це посилання вже зайняте' }));
+        toast.error('Посилання зайняте', { description: 'Оберіть інший slug для продукту.' });
         setSaving(false);
         return;
       }
       if (!res.ok) throw new Error('Save failed');
 
-      // фиксируем базу, чтобы бар спрятался
       initialComparableRef.current = JSON.stringify({ ...JSON.parse(comparable) });
+      toast.success('Збережено', { description: 'Продукт успішно збережено.' });
       router.push('/products');
     } catch {
-      // TODO: показать toast об ошибке
+      toast.error('Помилка збереження', {
+        description: 'Спробуйте ще раз або перевірте підключення.',
+      });
     } finally {
       setSaving(false);
     }
   };
 
-  /* ------------------------------------ delete ------------------------------------ */
+  /* delete */
   const doDelete = async () => {
     if (!data.id) return setShowDelete(false);
     setDeleting(true);
     try {
-      await fetch('/api/products', {
+      const res = await fetch('/api/products', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: [data.id] }),
       });
+      if (!res.ok) throw new Error('Delete failed');
+      toast.success('Видалено', { description: 'Продукт успішно видалено.' });
       setShowDelete(false);
       router.push('/products');
+    } catch {
+      toast.error('Не вдалося видалити', { description: 'Спробуйте ще раз.' });
     } finally {
       setDeleting(false);
     }
   };
 
-  /* ------------------------------ SEO preview values ------------------------------ */
+  /* SEO preview values */
   const SITE = process.env.NEXT_PUBLIC_SITE_URL || 'https://alcotrade.com.ua';
   const previewTitle = (data.seoTitle || data.name || '').trim() || 'Мета-заголовок';
   const previewDesc =
@@ -265,7 +282,7 @@ export default function ProductForm({
     (slug ? slugify(slug) : data.name ? slugify(data.name) : 'posylannya-na-produkt') ||
     'posylannya-na-produkt';
 
-  /* -------------------------------- top actions -------------------------------- */
+  /* actions */
   const resetToServer = () => {
     dispatch(hydrateFromServer(serverProduct ?? {}));
     setSlug(serverProduct?.slug ?? '');
@@ -288,6 +305,7 @@ export default function ProductForm({
       slug: serverProduct?.slug ?? (serverProduct?.name ? slugify(serverProduct.name) : ''),
     });
     initialComparableRef.current = initialFromServer;
+    toast('Зміни скасовано');
   };
 
   return (
@@ -518,6 +536,26 @@ export default function ProductForm({
    Variants
 ========================================================================================= */
 
+type VariantLike = { label?: string | null; volumeMl?: number | null };
+
+function detectUnit(v: VariantLike): UnitKey {
+  const label = (v.label || '').toLowerCase().trim();
+
+  // явные подсказки из подписи
+  if (label.includes('мл') || /\bml\b/.test(label)) return 'ml';
+  if (/\bcl\b/.test(label)) return 'cl';
+  // літри/литры (але не "мл")
+  if (/літр/.test(label) || /литр/.test(label) || /\bл\b/.test(label) || /\bl\b/.test(label)) {
+    // если было "мл", мы бы вышли раньше
+    return 'l';
+  }
+
+  // fallback по числу
+  const ml = v.volumeMl ?? 0;
+  if (ml >= 1000 && ml % 1000 === 0) return 'l';
+  return 'ml';
+}
+
 function VariantsSection({
   editorOpen,
   openEditor,
@@ -544,15 +582,15 @@ function VariantsSection({
   }
 
   if (editorOpen) {
-    // подготовим дефолтные строки из существующих variants
+    // дефолтные строки из существующих variants
     const defaults =
       data.variants.length > 0
         ? data.variants.map((v) => {
-            // пытаемся восстановить по volumeMl, иначе оставим ml
-            const ml = v.volumeMl ?? null;
-            if (ml && ml % 1000 === 0) return { value: String(ml / 1000), unit: 'l' as UnitKey };
-            if (ml && ml % 10 === 0) return { value: String(ml / 10), unit: 'cl' as UnitKey };
-            return { value: String(ml ?? ''), unit: 'ml' as UnitKey };
+            const unit = detectUnit({ label: v.label, volumeMl: v.volumeMl });
+            const ml = v.volumeMl ?? 0;
+            const value =
+              unit === 'l' ? String(ml / 1000) : unit === 'cl' ? String(ml / 10) : String(ml || '');
+            return { value, unit };
           })
         : [
             { value: '', unit: 'ml' as UnitKey },
@@ -565,7 +603,6 @@ function VariantsSection({
         defaultRows={defaults}
         onCancel={closeEditor}
         onSave={(name, rows) => {
-          // нормализуем -> массив {label, volumeMl}
           const items = rows
             .map(({ value, unit }) => {
               const n = parseInt(String(value || '').replace(/[^\d]/g, ''), 10);
@@ -574,9 +611,11 @@ function VariantsSection({
             })
             .filter(Boolean) as { label: string; volumeMl: number }[];
 
-          if (items.length === 0) return closeEditor();
+          if (items.length === 0) {
+            toast('Зміни скасовано');
+            return closeEditor();
+          }
 
-          // переносим данные старых вариантов (id, images) если совпали по volumeMl или label
           const prev = data.variants;
           const next = items.map((it, i) => {
             const found =
@@ -594,6 +633,7 @@ function VariantsSection({
           });
 
           dispatch(setField({ key: 'variants', value: next as any }));
+          toast.success('Варіанти оновлено');
           closeEditor();
         }}
       />
@@ -630,11 +670,22 @@ function VariantsSection({
             valueLabel={v.label ?? ''}
             imageUrl={v.imageUrl ?? null}
             onPick={async (file) => {
-              const media = await uploadOne(file);
-              dispatch(setVariantImage({ index: idx, media }));
+              try {
+                const media = await uploadOne(file);
+                dispatch(setVariantImage({ index: idx, media }));
+                toast.success('Фото додано', { description: v.label ?? undefined });
+              } catch {
+                toast.error('Не вдалося завантажити фото', { description: 'Спробуйте ще раз.' });
+              }
             }}
-            onRemoveImage={() => dispatch(clearVariantImage(idx))}
-            onRemove={() => dispatch(removeVariant(idx))}
+            onRemoveImage={() => {
+              dispatch(clearVariantImage(idx));
+              toast('Фото прибрано');
+            }}
+            onRemove={() => {
+              dispatch(removeVariant(idx));
+              toast('Варіант видалено');
+            }}
           />
         ))}
       </div>
@@ -670,8 +721,7 @@ function OptionEditor({
   const removeRow = (i: number) => setRows((rs) => rs.filter((_, idx) => idx !== i));
 
   const onValueChange = (i: number, raw: string) => {
-    // только целые числа
-    const cleaned = raw.replace(/[^\d]/g, '');
+    const cleaned = raw.replace(/[^\d]/g, ''); // только целые
     setRow(i, { value: cleaned });
   };
 
