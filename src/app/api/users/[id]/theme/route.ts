@@ -12,24 +12,25 @@ const toDb = (c: ClientTheme): DbTheme =>
   c === 'light' ? 'LIGHT' : c === 'dark' ? 'DARK' : 'DEFAULT';
 
 // GET /api/users/:id/theme -> { theme: 'light'|'dark'|'system' }
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, ctx: any) {
+  const { id } = ctx.params as { id: string };
+
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (session.user.id !== id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  if (session.user.id !== params.id)
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-
-  const user = await prisma.user.findUnique({ where: { id: params.id }, select: { theme: true } });
+  const user = await prisma.user.findUnique({ where: { id }, select: { theme: true } });
   const theme = user ? toClient(user.theme) : ('system' as ClientTheme);
   return NextResponse.json({ theme });
 }
 
 // PATCH /api/users/:id/theme body: { theme: 'light'|'dark'|'system' }
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, ctx: any) {
+  const { id } = ctx.params as { id: string };
+
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (session.user.id !== params.id)
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (session.user.id !== id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   let body: unknown;
   try {
@@ -43,6 +44,6 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     return NextResponse.json({ error: 'Invalid theme' }, { status: 400 });
   }
 
-  await prisma.user.update({ where: { id: params.id }, data: { theme: toDb(theme) } });
+  await prisma.user.update({ where: { id }, data: { theme: toDb(theme) } });
   return NextResponse.json({ ok: true, theme });
 }
