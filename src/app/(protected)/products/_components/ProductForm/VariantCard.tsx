@@ -2,6 +2,7 @@
 import { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Trash2 } from 'lucide-react';
+import Image from 'next/image';
 
 export default function VariantCard({
   productName,
@@ -32,7 +33,7 @@ export default function VariantCard({
             title="додати"
           >
             {imageUrl ? (
-              <img src={imageUrl} alt="" className="h-full w-full object-cover" />
+              <Image src={imageUrl} alt="" fill className="h-full w-full object-cover" />
             ) : (
               <span className="text-2xl">＋</span>
             )}
