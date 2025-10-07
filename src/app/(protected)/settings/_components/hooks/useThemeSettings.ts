@@ -1,32 +1,7 @@
 'use client';
-
 import { useEffect, useState } from 'react';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
-
-function applyTheme(mode: ThemeMode, persist: boolean) {
-  const html = document.documentElement;
-  const setDark = (v: boolean) => html.classList.toggle('dark', v);
-
-  if (mode === 'light') {
-    setDark(false);
-    if (persist) localStorage.setItem('theme', 'light');
-  } else if (mode === 'dark') {
-    setDark(true);
-    if (persist) localStorage.setItem('theme', 'dark');
-  } else {
-    const prefersDark =
-      typeof window !== 'undefined' &&
-      window.matchMedia &&
-      window.matchMedia('(prefers-color-scheme: dark)').matches;
-    setDark(!!prefersDark);
-    if (persist) localStorage.removeItem('theme');
-  }
-
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('themechange', { detail: { mode } }));
-  }
-}
 
 function readInitialTheme(): ThemeMode {
   if (typeof window === 'undefined') return 'system';
@@ -44,21 +19,41 @@ export function useThemeSettings() {
     const init = readInitialTheme();
     setInitial(init);
     setDraftState(init);
-    applyTheme(init, false);
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('theme:preview:end'));
+    }
   }, []);
 
   const dirty = mounted && draft !== initial;
 
   const setDraft = (mode: ThemeMode) => {
     setDraftState(mode);
-    applyTheme(mode, false);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('theme:preview', { detail: { mode } }));
+    }
+  };
+
+  const resetPreview = () => {
+    setDraftState(initial);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('theme:preview:end'));
+    }
   };
 
   const save = async () => {
     if (!dirty) return;
-    applyTheme(draft, true);
+
+    if (draft === 'light' || draft === 'dark') localStorage.setItem('theme', draft);
+    else localStorage.removeItem('theme');
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('theme:apply', { detail: { mode: draft } }));
+      window.dispatchEvent(new CustomEvent('theme:preview:end'));
+    }
+
     setInitial(draft);
   };
 
-  return { draft, setDraft, dirty, save };
+  return { draft, setDraft, dirty, save, resetPreview };
 }
