@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
@@ -8,43 +8,25 @@ import { Label } from '@/components/ui/label';
 
 type Props = {
   className?: string;
-  accept?: string;                 
-  maxSizeMb?: number;              
-  initialImageUrl?: string | null; 
-  valueDescription?: string;      
-  onChangeDescription?: (v: string) => void;
-  onSelect?: (file: File, previewUrl: string) => void; 
-  onClear?: () => void;                                 
+  accept?: string;
+  maxSizeMb?: number;
+  imageUrl?: string | null;
+  onSelect?: (file: File, previewUrl?: string) => void;
+  onClear?: () => void;
 };
 
 export default function SeoPhotoButton({
   className,
   accept = 'image/*',
   maxSizeMb = 10,
-  initialImageUrl = null,
+  imageUrl,
   onSelect,
   onClear,
 }: Props) {
   const inputRef = useRef<HTMLInputElement | null>(null);
-
-  
-
- 
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [fileName, setFileName] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
-  const lastObjectUrlRef = useRef<string | null>(null);
 
   const openPicker = () => inputRef.current?.click();
-
-  const revokeLast = () => {
-    if (lastObjectUrlRef.current) {
-      URL.revokeObjectURL(lastObjectUrlRef.current);
-      lastObjectUrlRef.current = null;
-    }
-  };
-
-  useEffect(() => () => revokeLast(), []);
 
   const validateFile = (f: File) => {
     if (!f.type.startsWith('image/')) return 'Потрібне зображення (JPEG/PNG/WebP тощо)';
@@ -55,7 +37,6 @@ export default function SeoPhotoButton({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setError(null);
     const f = e.target.files?.[0];
-   
     e.currentTarget.value = '';
     if (!f) return;
 
@@ -65,20 +46,10 @@ export default function SeoPhotoButton({
       return;
     }
 
-    revokeLast();
-    const url = URL.createObjectURL(f);
-    lastObjectUrlRef.current = url;
-
-    setPreviewUrl(url);
-    setFileName(f.name);
-
-    onSelect?.(f, url);
+    onSelect?.(f);
   };
 
   const cancelSelection = () => {
-    revokeLast();
-    setPreviewUrl(null);
-    setFileName('');
     setError(null);
     onClear?.();
   };
@@ -87,14 +58,10 @@ export default function SeoPhotoButton({
     'relative flex w-[325px] h-[158px] flex-col items-center gap-4 rounded-md border border-dashed bg-transparent px-16 py-6 shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-neutral-400 dark:focus:ring-neutral-700';
   const uploadBoxHover = 'hover:bg-neutral-50 dark:hover:bg-neutral-800/60';
 
-  
-  const shownImage = previewUrl ?? initialImageUrl ?? null;
+  const shownImage = imageUrl ?? null;
 
   return (
     <div className={cn('flex flex-col gap-4', className)}>
-      
-
-     
       <div className="flex flex-col gap-4">
         <Label htmlFor="meta-image" className="text-xl">
           Змінити мета-зображення
@@ -134,22 +101,18 @@ export default function SeoPhotoButton({
             </div>
 
             <div className="flex min-w-0 flex-col gap-2">
-              <span className="truncate text-sm text-neutral-700 dark:text-neutral-200">
-                {fileName || (initialImageUrl ? initialImageUrl.split('/').pop() ?? '' : '')}
-              </span>
-
               <div className="flex items-center gap-3">
                 <button
                   type="button"
                   onClick={openPicker}
-                  className="cursor-pointer text-sm underline text-neutral-800 dark:text-neutral-200"
+                  className="cursor-pointer text-sm text-neutral-800 underline dark:text-neutral-200"
                 >
                   Змінити
                 </button>
                 <button
                   type="button"
                   onClick={cancelSelection}
-                  className="cursor-pointer text-sm underline text-red-600 dark:text-red-400"
+                  className="cursor-pointer text-sm text-red-600 underline dark:text-red-400"
                 >
                   Скасувати вибір
                 </button>

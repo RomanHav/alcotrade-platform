@@ -10,16 +10,31 @@ export const maxDuration = 60;
 
 cloudinary.config({ secure: true });
 
-const DEFAULT_ID = 1;
-const MAX_TITLE = 60;
-const MAX_DESC = 160;
-const MAX_SUFFIX = 30;
+function envRequired(key: string): string {
+  const v = process.env[key];
+  if (!v || v.trim() === '') {
+    throw new Error(`Missing required env: ${key}`);
+  }
+  return v;
+}
+function envIntRequired(key: string): number {
+  const raw = envRequired(key);
+  const n = Number.parseInt(raw, 10);
+  if (!Number.isFinite(n)) throw new Error(`Env ${key} must be an integer`);
+  return n;
+}
+
+const DEFAULT_ID = envIntRequired('SITE_SETTINGS_DEFAULT_ID');
+const MAX_TITLE = envIntRequired('SEO_MAX_TITLE');
+const MAX_DESC = envIntRequired('SEO_MAX_DESC');
+const MAX_SUFFIX = envIntRequired('SEO_MAX_SUFFIX');
 const MAX_SIZE_BYTES = 10 * 1024 * 1024;
 
-const TITLE_SUFFIX_DEFAULT = '| Alcotrade';
+const TITLE_SUFFIX_DEFAULT = envRequired('SEO_TITLE_SUFFIX_DEFAULT');
 
-const OG_FOLDER = 'Alcotrade/site-settings';
-const OG_BASENAME = 'site-og';
+const OG_FOLDER = envRequired('CLOUDINARY_SEO_FOLDER');
+const OG_BASENAME = envRequired('CLOUDINARY_SEO_BASENAME');
+
 const OG_PUBLIC_ID = `${OG_FOLDER}/${OG_BASENAME}`;
 
 export async function GET() {
@@ -83,7 +98,7 @@ export async function PATCH(req: NextRequest) {
           );
         }
 
-        const buffer = Buffer.from(await file.arrayBuffer());
+        const buffer = Buffer.from(await (file as Blob).arrayBuffer());
 
         const uploaded = await new Promise<{ secure_url: string }>((resolve, reject) => {
           const stream = cloudinary.uploader.upload_stream(

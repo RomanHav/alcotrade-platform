@@ -14,7 +14,6 @@ type SeoSettingsProp = {
 type Props = {
   className?: string;
 
-  
   seoSettings: SeoSettingsProp;
 
   valueTitle: string;
@@ -23,8 +22,8 @@ type Props = {
   valueDescription: string;
   onChangeDescription: (v: string) => void;
 
-  initialImageUrl: string | null;
- 
+  imageUrl: string | null;
+
   onSelect: (file: File, previewUrl?: string) => void;
   onClear: () => void;
 
@@ -39,7 +38,7 @@ export default function SearchEnginesSettings({
   onChangeTitle,
   valueDescription,
   onChangeDescription,
-  initialImageUrl,
+  imageUrl,             
   onSelect,
   onClear,
   accept = 'image/*',
@@ -58,9 +57,7 @@ export default function SearchEnginesSettings({
       <div className="flex flex-col gap-2.5 bg-white p-2.5 dark:bg-neutral-800">
         <h3 className="text-xl text-[#0055FF] underline">{metaTitlePreview}</h3>
         <span className="text-sm text-[#B9B9B9]">https://alcotrade.com.ua/</span>
-        <p className="text-base text-[#616161]">
-          {defaultSeoDescription}
-        </p>
+        <p className="text-base text-[#616161]">{defaultSeoDescription}</p>
       </div>
 
       <div className="flex flex-col gap-4">
@@ -96,7 +93,7 @@ export default function SearchEnginesSettings({
         className={className}
         accept={accept}
         maxSizeMb={maxSizeMb}
-        initialImageUrl={initialImageUrl}
+        imageUrl={imageUrl}       
         onSelect={onSelect}
         onClear={onClear}
       />
