@@ -44,7 +44,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
         ]
       : baseGallery;
 
-  const serverProduct: Partial<ProductFormState> = {
+  const serverProduct: Partial<ProductFormState> & { slug?: string | null } = {
     id: product.id,
     name: product.name,
     status: product.status as ProductFormState['status'],
@@ -52,11 +52,9 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
     description: product.description ?? undefined,
     seoTitle: product.seoTitle ?? null,
     seoDescription: product.seoDescription ?? null,
-
     coverId: product.coverId ?? null,
     coverFallbackUrl: product.cover?.url ?? null,
     images,
-
     variants: product.variants.map((v) => ({
       id: v.id,
       label: v.label ?? undefined,
@@ -65,6 +63,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
       imageId: v.imageId ?? null,
       imageUrl: v.image?.url ?? null,
     })),
+    slug: product.slug ?? null,
   };
 
   return <ProductForm brands={brands} serverProduct={serverProduct} />;
