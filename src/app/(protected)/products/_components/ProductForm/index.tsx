@@ -16,16 +16,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 
 import MediaPicker from '../MediaPicker';
 import VariantsSection from './VariantsSection';
@@ -36,6 +26,7 @@ import type { ProductStatus } from '@prisma/client';
 import { slugify } from './utils/slug';
 import { useDirtySnapshot } from './hooks/useDirtySnapshot';
 import { saveProduct, deleteProduct } from '@/store/operations/products';
+import ConfirmDeleteDialog from '@/components/common/ConfirmDeleteDialog';
 
 type Brand = { id: string; name: string };
 
@@ -140,14 +131,12 @@ export default function ProductForm({
 
     try {
       await dispatch(saveProduct(payload)).unwrap();
-      // фиксация базы — прячем sticky bar
-      initialRef.current = JSON.stringify({ ...JSON.parse(comparable) });
       toast.success('Збережено', { description: 'Продукт успішно збережено.' });
       router.push('/products');
     } catch (e: any) {
-      if (e?.code === 409) {
+      if (e?.message === 'slug_taken') {
         setErrors((prev) => ({ ...prev, slug: 'Це посилання вже зайняте' }));
-        toast.error('Посилання зайняте', { description: 'Оберіть інший slug для продукту.' });
+        toast.error('Посилання зайняте', { description: 'Оберіть інший slug.' });
       } else {
         toast.error('Помилка збереження', { description: 'Спробуйте ще раз.' });
       }
@@ -161,12 +150,11 @@ export default function ProductForm({
     if (!data.id) return setShowDelete(false);
     setDeleting(true);
     try {
-      await dispatch(deleteProduct({ id: data.id })).unwrap();
-      toast.success('Видалено', { description: 'Продукт успішно видалено.' });
-      setShowDelete(false);
+      await dispatch(deleteProduct({ id: data.id! })).unwrap();
+      toast.success('Видалено', { description: 'Продукт видалено.' });
       router.push('/products');
-    } catch {
-      toast.error('Не вдалося видалити', { description: 'Спробуйте ще раз.' });
+    } catch (e: any) {
+      toast.error('Не вдалося видалити', { description: e?.message ?? 'Спробуйте ще раз.' });
     } finally {
       setDeleting(false);
     }
@@ -384,25 +372,15 @@ export default function ProductForm({
             <Button variant="destructive" onClick={() => setShowDelete(true)} disabled={deleting}>
               {deleting ? 'Видалення…' : 'Видалити'}
             </Button>
-            <AlertDialog open={showDelete} onOpenChange={setShowDelete}>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Видалити продукт?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Дію неможливо скасувати. Будуть видалені також варіанти.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Скасувати</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={onDelete}
-                    className="bg-destructive hover:bg-destructive/90 text-white"
-                  >
-                    Підтвердити
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <ConfirmDeleteDialog
+              open={showDelete}
+              onOpenChange={setShowDelete}
+              title="Видалити продукт?"
+              description="Дію неможливо скасувати. Будуть видалені також варіанти."
+              confirmLabel="Підтвердити"
+              loading={deleting}
+              onConfirm={onDelete}
+            />
           </>
         )}
         <Button onClick={onSave} disabled={saving || !isDirty}>
