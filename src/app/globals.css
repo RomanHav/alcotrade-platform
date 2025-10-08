@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 @plugin "tailwindcss-animate";
 
 @custom-variant dark (&:is(.dark *));
@@ -124,4 +124,8 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Geologica, sans-serif;
+}
+
+button {
+  cursor: pointer;
 }

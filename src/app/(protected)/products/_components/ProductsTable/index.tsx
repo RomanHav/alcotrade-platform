@@ -32,7 +32,7 @@ import SortSheet from './SortSheet';
 import ConfirmDeleteDialog from '@/components/common/ConfirmDeleteDialog';
 import { deleteProductsBulk } from '@/store/operations/products';
 import { toast } from 'sonner';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 
 type Item = {
   id: string;
@@ -53,8 +53,6 @@ function arraysEqual(a: string[], b: string[]) {
   return true;
 }
 
-type FilterDraft = { query: string; status?: string; brand?: string };
-
 export default function ProductsTable({
   items,
   total,
@@ -72,17 +70,20 @@ export default function ProductsTable({
   const selectedIds = useAppSelector((s) => s.productsUi.selectedIds);
 
   /* ----------------------- sheets state + drafts ----------------------- */
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [sortOpen, setSortOpen] = useState(false);
 
-  const [filterDraft, setFilterDraft] = useState<FilterDraft>({
+  type FilterDraft = { query: string; status?: string; brand?: string };
+
+  const [filterOpen, setFilterOpen] = React.useState(false);
+  const [sortOpen, setSortOpen] = React.useState(false);
+
+  const [filterDraft, setFilterDraft] = React.useState<FilterDraft>({
     query: sp.get('query') ?? '',
     status: sp.get('status') ?? undefined,
     brand: sp.get('brand') ?? undefined,
   });
-  const [sortDraft, setSortDraft] = useState<string>(sp.get('sort') ?? 'name_asc');
+  const [sortDraft, setSortDraft] = React.useState<string>(sp.get('sort') ?? 'name_asc');
 
-  useEffect(() => {
+  React.useEffect(() => {
     setFilterDraft({
       query: sp.get('query') ?? '',
       status: sp.get('status') ?? undefined,
@@ -92,15 +93,15 @@ export default function ProductsTable({
   }, [sp.toString()]);
 
   /* --------------------- selection <-> redux sync ---------------------- */
-  const pageIds = useMemo(() => items.map((i) => i.id), [items]);
+  const pageIds = React.useMemo(() => items.map((i) => i.id), [items]);
 
-  const rowSelection = useMemo(() => {
+  const rowSelection = React.useMemo(() => {
     const o: RowSelectionState = {};
     for (const id of selectedIds) if (pageIds.includes(id)) o[id] = true;
     return o;
   }, [selectedIds, pageIds]);
 
-  const handleRowSelectionChange = useCallback(
+  const handleRowSelectionChange = React.useCallback(
     (updater: RowSelectionState | ((old: RowSelectionState) => RowSelectionState)) => {
       const current = rowSelection;
       const next = typeof updater === 'function' ? (updater as any)(current) : updater;
@@ -120,7 +121,7 @@ export default function ProductsTable({
     [rowSelection, selectedIds, pageIds, dispatch],
   );
 
-  const columns = useMemo<ColumnDef<Item>[]>(
+  const columns = React.useMemo<ColumnDef<Item>[]>(
     () => [
       {
         id: 'select',
@@ -197,7 +198,7 @@ export default function ProductsTable({
     [],
   );
 
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [sorting, setSorting] = React.useState<SortingState>([]);
   const table = useReactTable({
     data: items,
     columns,
@@ -209,7 +210,7 @@ export default function ProductsTable({
     getRowId: (row) => row.id,
   });
 
-  useEffect(() => {
+  React.useEffect(() => {
     const ids = Object.entries(rowSelection)
       .filter(([, v]) => !!v)
       .map(([id]) => id)
@@ -218,7 +219,7 @@ export default function ProductsTable({
   }, [rowSelection, selectedIds, dispatch]);
 
   /* --------------------------- apply helpers --------------------------- */
-  const applyParams = useCallback(
+  const applyParams = React.useCallback(
     (patch: Record<string, string | undefined>) => {
       const params = new URLSearchParams(sp.toString());
       for (const [k, v] of Object.entries(patch)) {
@@ -254,8 +255,8 @@ export default function ProductsTable({
   };
 
   /* -------------------------- bulk deletion --------------------------- */
-  const [showDelete, setShowDelete] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [showDelete, setShowDelete] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
 
   const onBulkDelete = async () => {
     if (!selectedIds.length) return;
@@ -294,9 +295,13 @@ export default function ProductsTable({
   if (sp.get('status')) activeFilters.push({ label: `Статус: ${sp.get('status')}`, key: 'status' });
 
   return (
-    <div className="bg-card rounded-2xl border p-3 shadow-sm">
+    <motion.div
+      layout
+      className="bg-card rounded-2xl border p-5 shadow-sm"
+      transition={{ duration: 0.2 }}
+    >
       {/* top bar */}
-      <div className="mb-3 flex items-center gap-2">
+      <motion.div layout className="mb-3 flex items-center gap-2">
         <Input
           placeholder="Пошук"
           defaultValue={sp.get('query') ?? ''}
@@ -329,52 +334,74 @@ export default function ProductsTable({
             <a href="/products/new">Додати новий</a>
           </Button>
         </div>
-      </div>
+      </motion.div>
 
       {/* active chips */}
-      <div className="mb-2 flex flex-wrap items-center gap-3">
-        {activeFilters.length > 0 && (
-          <>
-            <span className="text-sm">Фільтри:</span>
-            {activeFilters.map((f) => (
-              <span
-                key={f.key}
-                className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs"
+      <motion.div layout className="mb-2 flex flex-wrap items-center gap-3">
+        <AnimatePresence initial={false}>
+          {activeFilters.length > 0 && (
+            <motion.span
+              key="filters-label"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="text-sm"
+            >
+              Фільтри:
+            </motion.span>
+          )}
+          {activeFilters.map((f) => (
+            <motion.span
+              key={f.key}
+              layout
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.15 }}
+              className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs"
+            >
+              {f.label}
+              <button
+                className="opacity-70 transition-opacity hover:opacity-100"
+                onClick={() => applyParams({ [f.key]: undefined })}
+                title="Очистити"
               >
-                {f.label}
-                <button
-                  className="opacity-70 hover:opacity-100"
-                  onClick={() => applyParams({ [f.key]: undefined })}
-                  title="Очистити"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </span>
-            ))}
-          </>
-        )}
-      </div>
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </motion.span>
+          ))}
+        </AnimatePresence>
+      </motion.div>
 
       {/* selection bar */}
-      {selectedIds.length > 0 && (
-        <div className="bg-muted/40 mb-2 flex items-center justify-between rounded-lg border px-3 py-2">
-          <div className="text-sm">
-            Обрано: <b>{selectedIds.length}</b>{' '}
-            <button
-              className="underline opacity-70 hover:opacity-100"
-              onClick={() => dispatch(clearSelection())}
-            >
-              Очистити
-            </button>
-          </div>
-          <Button variant="destructive" onClick={() => setShowDelete(true)}>
-            <Trash2 className="mr-2 size-4" /> Видалити
-          </Button>
-        </div>
-      )}
+      <AnimatePresence>
+        {selectedIds.length > 0 && (
+          <motion.div
+            key="selection-bar"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="bg-muted/40 mb-2 flex items-center justify-between rounded-lg border px-3 py-2 shadow-sm"
+          >
+            <div className="text-sm">
+              Обрано: <b>{selectedIds.length}</b>{' '}
+              <button
+                className="underline opacity-70 transition-opacity hover:opacity-100"
+                onClick={() => dispatch(clearSelection())}
+              >
+                Очистити
+              </button>
+            </div>
+            <Button variant="destructive" onClick={() => setShowDelete(true)}>
+              <Trash2 className="mr-2 size-4" /> Видалити
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* table */}
-      <div className="overflow-x-auto rounded-lg border">
+      <motion.div layout className="overflow-x-auto rounded-lg border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((hg) => (
@@ -388,10 +415,14 @@ export default function ProductsTable({
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows.map((r) => (
-              <TableRow key={r.id} data-state={r.getIsSelected() && 'selected'}>
+            {table.getRowModel().rows.map((r, i) => (
+              <TableRow
+                key={r.id}
+                data-state={r.getIsSelected() && 'selected'}
+                className={`${i % 2 === 1 && 'bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700'} transition-colors`}
+              >
                 {r.getVisibleCells().map((c) => (
-                  <TableCell key={c.id}>
+                  <TableCell key={c.id} className={`transition-colors`}>
                     {flexRender(c.column.columnDef.cell, c.getContext())}
                   </TableCell>
                 ))}
@@ -399,10 +430,10 @@ export default function ProductsTable({
             ))}
           </TableBody>
         </Table>
-      </div>
+      </motion.div>
 
       {/* pagination */}
-      <div className="mt-3 flex items-center justify-center gap-2 text-sm">
+      <motion.div layout className="mt-3 flex items-center justify-center gap-2 text-sm">
         <Button
           variant="ghost"
           onClick={() => goToPage(Math.max(1, page - 1))}
@@ -411,16 +442,16 @@ export default function ProductsTable({
           «
         </Button>
         <span>
-          {page} / {totalPages}
+          {page} / {Math.max(1, Math.ceil(total / PAGE_SIZE))}
         </span>
         <Button
           variant="ghost"
-          onClick={() => goToPage(Math.min(totalPages, page + 1))}
-          disabled={page >= totalPages}
+          onClick={() => goToPage(Math.min(Math.max(1, Math.ceil(total / PAGE_SIZE)), page + 1))}
+          disabled={page >= Math.max(1, Math.ceil(total / PAGE_SIZE))}
         >
           »
         </Button>
-      </div>
+      </motion.div>
 
       <ConfirmDeleteDialog
         open={showDelete}
@@ -433,6 +464,6 @@ export default function ProductsTable({
         loading={deleting}
         onConfirm={onBulkDelete}
       />
-    </div>
+    </motion.div>
   );
 }

@@ -87,9 +87,9 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   ]);
 
   return (
-    <div className="px-4 pt-6 md:px-6">
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Продукти</h1>
+    <div className="px-8 pt-16">
+      <div className="mb-9 flex items-center justify-between">
+        <h1 className="text-4xl font-semibold">Продукти</h1>
       </div>
       <ProductsTable items={items} total={total} page={page} brands={brands} />
     </div>
