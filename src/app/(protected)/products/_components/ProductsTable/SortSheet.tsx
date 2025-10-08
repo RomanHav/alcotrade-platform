@@ -9,14 +9,14 @@ import { SlidersHorizontal } from 'lucide-react';
 export default function SortSheet({
   open,
   setOpen,
-  sp,
-  applyParam,
+  draft,
+  setDraft,
   onApply,
 }: {
   open: boolean;
   setOpen: (v: boolean) => void;
-  sp: URLSearchParams;
-  applyParam: (key: string, value?: string) => void;
+  draft: string;
+  setDraft: (v: string) => void;
   onApply: () => void;
 }) {
   const options: [string, string][] = [
@@ -40,10 +40,7 @@ export default function SortSheet({
           <SheetTitle>Сортувати за:</SheetTitle>
         </SheetHeader>
         <div className="mt-6">
-          <RadioGroup
-            defaultValue={sp.get('sort') ?? 'name_asc'}
-            onValueChange={(v) => applyParam('sort', v)}
-          >
+          <RadioGroup value={draft} onValueChange={setDraft}>
             {options.map(([v, label]) => (
               <div key={v} className="flex items-center space-x-2 py-2">
                 <RadioGroupItem value={v} id={v} />
