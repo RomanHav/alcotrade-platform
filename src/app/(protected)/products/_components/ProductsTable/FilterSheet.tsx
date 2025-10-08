@@ -13,20 +13,24 @@ import {
 } from '@/components/ui/select';
 import { Filter } from 'lucide-react';
 
+export type FilterDraft = { query: string; status?: string; brand?: string };
+
 export default function FilterSheet({
   open,
   setOpen,
   brands,
-  sp,
-  applyParam,
+  draft,
+  setDraft,
   onApply,
+  onClear,
 }: {
   open: boolean;
   setOpen: (v: boolean) => void;
   brands: { id: string; name: string; slug: string }[];
-  sp: URLSearchParams;
-  applyParam: (key: string, value?: string) => void;
-  onApply: () => void; // скрыть + refresh
+  draft: FilterDraft;
+  setDraft: React.Dispatch<React.SetStateAction<FilterDraft>>;
+  onApply: () => void;
+  onClear: () => void;
 }) {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -45,16 +49,16 @@ export default function FilterSheet({
             <div className="mb-2 text-sm font-medium">Назва продукту</div>
             <Input
               placeholder="містить…"
-              defaultValue={sp.get('query') ?? ''}
-              onBlur={(e) => applyParam('query', e.target.value || undefined)}
+              value={draft.query}
+              onChange={(e) => setDraft({ ...draft, query: e.target.value })}
             />
           </div>
 
           <div>
             <div className="mb-2 text-sm font-medium">Статус</div>
             <Select
-              defaultValue={sp.get('status') ?? undefined}
-              onValueChange={(v) => applyParam('status', v)}
+              value={draft.status ?? ''}
+              onValueChange={(v) => setDraft({ ...draft, status: v || undefined })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Оберіть статус" />
@@ -70,8 +74,8 @@ export default function FilterSheet({
           <div>
             <div className="mb-2 text-sm font-medium">Бренд</div>
             <Select
-              defaultValue={sp.get('brand') ?? undefined}
-              onValueChange={(v) => applyParam('brand', v)}
+              value={draft.brand ?? ''}
+              onValueChange={(v) => setDraft({ ...draft, brand: v || undefined })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Оберіть бренд" />
@@ -89,7 +93,7 @@ export default function FilterSheet({
           <Button onClick={onApply} className="w-full">
             Застосувати
           </Button>
-          <Button variant="ghost" onClick={() => onApply()} className="w-full">
+          <Button variant="ghost" onClick={onClear} className="w-full">
             Очистити
           </Button>
         </div>

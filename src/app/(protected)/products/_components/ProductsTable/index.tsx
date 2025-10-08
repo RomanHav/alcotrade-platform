@@ -32,6 +32,7 @@ import SortSheet from './SortSheet';
 import ConfirmDeleteDialog from '@/components/common/ConfirmDeleteDialog';
 import { deleteProductsBulk } from '@/store/operations/products';
 import { toast } from 'sonner';
+import { AnimatePresence, motion } from 'framer-motion';
 
 type Item = {
   id: string;
@@ -68,18 +69,32 @@ export default function ProductsTable({
   const dispatch = useAppDispatch();
   const selectedIds = useAppSelector((s) => s.productsUi.selectedIds);
 
-  // контролируем шторы (нужно, чтобы «Застосувати» закрывало)
+  /* ----------------------- sheets state + drafts ----------------------- */
+
+  type FilterDraft = { query: string; status?: string; brand?: string };
+
   const [filterOpen, setFilterOpen] = React.useState(false);
   const [sortOpen, setSortOpen] = React.useState(false);
 
-  // confirm delete
-  const [showDelete, setShowDelete] = React.useState(false);
-  const [deleting, setDeleting] = React.useState(false);
+  const [filterDraft, setFilterDraft] = React.useState<FilterDraft>({
+    query: sp.get('query') ?? '',
+    status: sp.get('status') ?? undefined,
+    brand: sp.get('brand') ?? undefined,
+  });
+  const [sortDraft, setSortDraft] = React.useState<string>(sp.get('sort') ?? 'name_asc');
 
-  // ids текущей страницы (стабильный мемо)
+  React.useEffect(() => {
+    setFilterDraft({
+      query: sp.get('query') ?? '',
+      status: sp.get('status') ?? undefined,
+      brand: sp.get('brand') ?? undefined,
+    });
+    setSortDraft(sp.get('sort') ?? 'name_asc');
+  }, [sp.toString()]);
+
+  /* --------------------- selection <-> redux sync ---------------------- */
   const pageIds = React.useMemo(() => items.map((i) => i.id), [items]);
 
-  // rowSelection из Redux (только пересечение со страницей)
   const rowSelection = React.useMemo(() => {
     const o: RowSelectionState = {};
     for (const id of selectedIds) if (pageIds.includes(id)) o[id] = true;
@@ -195,7 +210,6 @@ export default function ProductsTable({
     getRowId: (row) => row.id,
   });
 
-  // sync (страница) -> redux если щёлкали по чекбоксам слева
   React.useEffect(() => {
     const ids = Object.entries(rowSelection)
       .filter(([, v]) => !!v)
@@ -204,24 +218,45 @@ export default function ProductsTable({
     if (!arraysEqual(ids, selectedIds)) dispatch(setSelectedIds(ids));
   }, [rowSelection, selectedIds, dispatch]);
 
-  // helpers навигации
-  const applyParam = (key: string, value?: string) => {
-    const params = new URLSearchParams(sp.toString());
-    if (!value) params.delete(key);
-    else params.set(key, value);
-    params.set('page', '1');
-    params.set('limit', String(PAGE_SIZE)); // всегда 10
-    router.push(`?${params.toString()}`);
+  /* --------------------------- apply helpers --------------------------- */
+  const applyParams = React.useCallback(
+    (patch: Record<string, string | undefined>) => {
+      const params = new URLSearchParams(sp.toString());
+      for (const [k, v] of Object.entries(patch)) {
+        if (!v) params.delete(k);
+        else params.set(k, v);
+      }
+      params.set('page', '1');
+      params.set('limit', String(PAGE_SIZE));
+      router.push(`?${params.toString()}`);
+    },
+    [router, sp],
+  );
+
+  const applyFilter = () => {
+    applyParams({
+      query: filterDraft.query || undefined,
+      status: filterDraft.status || undefined,
+      brand: filterDraft.brand || undefined,
+    });
+    setFilterOpen(false);
   };
-  const onApplySheets = () => {
-    const params = new URLSearchParams(sp.toString());
+  const clearFilter = () => {
+    setFilterDraft({ query: '', status: undefined, brand: undefined });
+    const params = new URLSearchParams();
     params.set('page', '1');
     params.set('limit', String(PAGE_SIZE));
     router.push(`?${params.toString()}`);
     setFilterOpen(false);
-    setSortOpen(false);
-    router.refresh();
   };
+  const applySort = () => {
+    applyParams({ sort: sortDraft || 'name_asc' });
+    setSortOpen(false);
+  };
+
+  /* -------------------------- bulk deletion --------------------------- */
+  const [showDelete, setShowDelete] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
 
   const onBulkDelete = async () => {
     if (!selectedIds.length) return;
@@ -239,8 +274,17 @@ export default function ProductsTable({
     }
   };
 
+  /* ------------------------------ pagination ------------------------------ */
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
+  const goToPage = (next: number) => {
+    const params = new URLSearchParams(sp.toString());
+    params.set('limit', String(PAGE_SIZE));
+    params.set('page', String(next));
+    router.push(`?${params.toString()}`);
+  };
+
+  /* ------------------------------ active filters ------------------------------ */
   const activeFilters: { label: string; key: string }[] = [];
   if (sp.get('brand')) {
     const b = brands.find((x) => x.slug === sp.get('brand'));
@@ -251,14 +295,19 @@ export default function ProductsTable({
   if (sp.get('status')) activeFilters.push({ label: `Статус: ${sp.get('status')}`, key: 'status' });
 
   return (
-    <div className="bg-card rounded-2xl border p-3 shadow-sm">
-      <div className="mb-3 flex items-center gap-2">
+    <motion.div
+      layout
+      className="bg-card rounded-2xl border p-5 shadow-sm"
+      transition={{ duration: 0.2 }}
+    >
+      {/* top bar */}
+      <motion.div layout className="mb-3 flex items-center gap-2">
         <Input
           placeholder="Пошук"
           defaultValue={sp.get('query') ?? ''}
           onKeyDown={(e) => {
             if (e.key === 'Enter')
-              applyParam('query', (e.target as HTMLInputElement).value || undefined);
+              applyParams({ query: (e.target as HTMLInputElement).value || undefined });
           }}
           className="w-56"
         />
@@ -267,16 +316,17 @@ export default function ProductsTable({
           open={filterOpen}
           setOpen={setFilterOpen}
           brands={brands}
-          sp={sp}
-          applyParam={applyParam}
-          onApply={onApplySheets}
+          draft={filterDraft}
+          setDraft={setFilterDraft}
+          onApply={applyFilter}
+          onClear={clearFilter}
         />
         <SortSheet
           open={sortOpen}
           setOpen={setSortOpen}
-          sp={sp}
-          applyParam={applyParam}
-          onApply={onApplySheets}
+          draft={sortDraft}
+          setDraft={setSortDraft}
+          onApply={applySort}
         />
 
         <div className="ml-auto flex items-center gap-2">
@@ -284,49 +334,74 @@ export default function ProductsTable({
             <a href="/products/new">Додати новий</a>
           </Button>
         </div>
-      </div>
+      </motion.div>
 
-      <div className="mb-2 flex flex-wrap items-center gap-3">
-        {activeFilters.length > 0 && (
-          <>
-            <span className="text-sm">Фільтри:</span>
-            {activeFilters.map((f) => (
-              <span
-                key={f.key}
-                className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs"
-              >
-                {f.label}
-                <button
-                  className="opacity-70 hover:opacity-100"
-                  onClick={() => applyParam(f.key, undefined)}
-                  title="Очистити"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </span>
-            ))}
-          </>
-        )}
-      </div>
-
-      {selectedIds.length > 0 && (
-        <div className="bg-muted/40 mb-2 flex items-center justify-between rounded-lg border px-3 py-2">
-          <div className="text-sm">
-            Обрано: <b>{selectedIds.length}</b>{' '}
-            <button
-              className="underline opacity-70 hover:opacity-100"
-              onClick={() => dispatch(clearSelection())}
+      {/* active chips */}
+      <motion.div layout className="mb-2 flex flex-wrap items-center gap-3">
+        <AnimatePresence initial={false}>
+          {activeFilters.length > 0 && (
+            <motion.span
+              key="filters-label"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="text-sm"
             >
-              Очистити
-            </button>
-          </div>
-          <Button variant="destructive" onClick={() => setShowDelete(true)}>
-            <Trash2 className="mr-2 size-4" /> Видалити
-          </Button>
-        </div>
-      )}
+              Фільтри:
+            </motion.span>
+          )}
+          {activeFilters.map((f) => (
+            <motion.span
+              key={f.key}
+              layout
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.15 }}
+              className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs"
+            >
+              {f.label}
+              <button
+                className="opacity-70 transition-opacity hover:opacity-100"
+                onClick={() => applyParams({ [f.key]: undefined })}
+                title="Очистити"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </motion.span>
+          ))}
+        </AnimatePresence>
+      </motion.div>
 
-      <div className="overflow-x-auto rounded-lg border">
+      {/* selection bar */}
+      <AnimatePresence>
+        {selectedIds.length > 0 && (
+          <motion.div
+            key="selection-bar"
+            initial={{ opacity: 0, y: -8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+            className="bg-muted/40 mb-2 flex items-center justify-between rounded-lg border px-3 py-2 shadow-sm"
+          >
+            <div className="text-sm">
+              Обрано: <b>{selectedIds.length}</b>{' '}
+              <button
+                className="underline opacity-70 transition-opacity hover:opacity-100"
+                onClick={() => dispatch(clearSelection())}
+              >
+                Очистити
+              </button>
+            </div>
+            <Button variant="destructive" onClick={() => setShowDelete(true)}>
+              <Trash2 className="mr-2 size-4" /> Видалити
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* table */}
+      <motion.div layout className="overflow-x-auto rounded-lg border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((hg) => (
@@ -340,10 +415,14 @@ export default function ProductsTable({
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows.map((r) => (
-              <TableRow key={r.id} data-state={r.getIsSelected() && 'selected'}>
+            {table.getRowModel().rows.map((r, i) => (
+              <TableRow
+                key={r.id}
+                data-state={r.getIsSelected() && 'selected'}
+                className={`${i % 2 === 1 && 'bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700'} transition-colors`}
+              >
                 {r.getVisibleCells().map((c) => (
-                  <TableCell key={c.id}>
+                  <TableCell key={c.id} className={`transition-colors`}>
                     {flexRender(c.column.columnDef.cell, c.getContext())}
                   </TableCell>
                 ))}
@@ -351,37 +430,28 @@ export default function ProductsTable({
             ))}
           </TableBody>
         </Table>
-      </div>
+      </motion.div>
 
-      <div className="mt-3 flex items-center justify-center gap-2 text-sm">
+      {/* pagination */}
+      <motion.div layout className="mt-3 flex items-center justify-center gap-2 text-sm">
         <Button
           variant="ghost"
-          onClick={() => {
-            const params = new URLSearchParams(sp.toString());
-            params.set('limit', String(PAGE_SIZE));
-            params.set('page', String(Math.max(1, page - 1)));
-            router.push(`?${params.toString()}`);
-          }}
+          onClick={() => goToPage(Math.max(1, page - 1))}
           disabled={page <= 1}
         >
           «
         </Button>
         <span>
-          {page} / {totalPages}
+          {page} / {Math.max(1, Math.ceil(total / PAGE_SIZE))}
         </span>
         <Button
           variant="ghost"
-          onClick={() => {
-            const params = new URLSearchParams(sp.toString());
-            params.set('limit', String(PAGE_SIZE));
-            params.set('page', String(Math.min(totalPages, page + 1)));
-            router.push(`?${params.toString()}`);
-          }}
-          disabled={page >= totalPages}
+          onClick={() => goToPage(Math.min(Math.max(1, Math.ceil(total / PAGE_SIZE)), page + 1))}
+          disabled={page >= Math.max(1, Math.ceil(total / PAGE_SIZE))}
         >
           »
         </Button>
-      </div>
+      </motion.div>
 
       <ConfirmDeleteDialog
         open={showDelete}
@@ -394,6 +464,6 @@ export default function ProductsTable({
         loading={deleting}
         onConfirm={onBulkDelete}
       />
-    </div>
+    </motion.div>
   );
 }
