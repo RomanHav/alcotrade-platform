@@ -3,10 +3,10 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_DATABASE_URL")
-  // relationMode = "foreignKeys"
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+  directUrl    = env("DIRECT_DATABASE_URL")
+  relationMode = "foreignKeys"
 }
 
 enum Role {
@@ -123,11 +123,12 @@ model Product {
   slug        String        @unique
   description String?
   status      ProductStatus @default(DRAFT)
-  brandId     String
-  brand       Brand         @relation(fields: [brandId], references: [id])
+
+  brandId String
+  brand   Brand  @relation(fields: [brandId], references: [id], onDelete: Restrict) // ⬅️ RESTRICT
 
   coverId String?
-  cover   MediaAsset?    @relation(fields: [coverId], references: [id])
+  cover   MediaAsset?    @relation(fields: [coverId], references: [id], onDelete: SetNull) // ⬅️ SET NULL
   images  ProductImage[]
 
   variants ProductVariant[]
@@ -192,7 +193,7 @@ model Brand {
   seoDescription String? @db.VarChar(160)
 
   coverId String?
-  cover   MediaAsset? @relation(fields: [coverId], references: [id])
+  cover   MediaAsset? @relation(fields: [coverId], references: [id], onDelete: SetNull) // ⬅️ SET NULL
 
   products Product[]
 
@@ -217,4 +218,3 @@ model Partner {
 
   @@index([name])
 }
-

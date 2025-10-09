@@ -1,3 +1,4 @@
+// src/components/common/ConfirmDeleteDialog.tsx
 'use client';
 
 import * as React from 'react';
@@ -10,7 +11,20 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+
+type Props = {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  title?: string;
+  description?: string;
+  confirmLabel?: string;
+  loading?: boolean;
+  onConfirm: () => void | Promise<void>;
+  /** опционально — можно передать кнопку-триггер */
+  children?: React.ReactNode;
+};
 
 export default function ConfirmDeleteDialog({
   open,
@@ -20,17 +34,11 @@ export default function ConfirmDeleteDialog({
   confirmLabel = 'Підтвердити',
   loading = false,
   onConfirm,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  title?: string;
-  description?: string;
-  confirmLabel?: string;
-  loading?: boolean;
-  onConfirm: () => void;
-}) {
+  children,
+}: Props) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
+      {children ? <AlertDialogTrigger asChild>{children}</AlertDialogTrigger> : null}
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>

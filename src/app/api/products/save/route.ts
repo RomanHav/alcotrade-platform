@@ -27,7 +27,7 @@ type SaveInput = {
 
 // Генерация уникального slug (для случаев, когда slug не задан явно)
 async function ensureUniqueSlug(
-  tx: Prisma.TransactionClient, // 👈 правильный тип
+  tx: Prisma.TransactionClient,
   base: string,
   excludeId?: string,
 ): Promise<string> {
@@ -165,7 +165,6 @@ export async function POST(req: Request) {
     if (err instanceof Error && err.message === 'SLUG_TAKEN') {
       return NextResponse.json({ ok: false, code: 'SLUG_TAKEN' }, { status: 409 });
     }
-    // на всякий
     return NextResponse.json({ ok: false }, { status: 500 });
   }
 }

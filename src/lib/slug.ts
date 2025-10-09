@@ -1,3 +1,4 @@
+// src/lib/slug.ts
 export function slug(input: string): string {
   const map: Record<string, string> = {
     а: 'a',
@@ -38,10 +39,15 @@ export function slug(input: string): string {
     э: 'e',
     ы: 'y',
   };
+
   return input
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
-    .replace(/[\u0400-\u04FF]/g, (ch) => map[ch] ?? ch)
+    .replace(/['’]/g, '') // апострофы
+    .replace(/[\u0400-\u04FF]/g, (ch) => map[ch] ?? '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
+    .replace(/-+/g, '-')
     .slice(0, 80);
 }

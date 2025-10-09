@@ -23,7 +23,7 @@ import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { hydrateFromServer, setField } from '@/store/slices/productFormSlice';
 import type { ProductFormState } from '@/store/slices/productFormSlice';
 import type { ProductStatus } from '@prisma/client';
-import { slugify } from './utils/slug';
+import { slug as makeSlug } from '@/lib/slug';
 import { useDirtySnapshot } from './hooks/useDirtySnapshot';
 import { saveProduct, deleteProduct } from '@/store/operations/products';
 import ConfirmDeleteDialog from '@/components/common/ConfirmDeleteDialog';
@@ -46,23 +46,19 @@ export default function ProductForm({
   const [showDelete, setShowDelete] = useState(false);
   const [editorOpen, setEditorOpen] = useState(true);
 
-  // slug: автоген с заголовка, пока пользователь не трогал поле
   const [slug, setSlug] = useState<string>(serverProduct?.slug ?? '');
   const slugTouchedRef = useRef(false);
 
-  // гидратация формы из серверных данных
   useEffect(() => {
     dispatch(hydrateFromServer(serverProduct ?? {}));
     slugTouchedRef.current = false;
     setSlug(serverProduct?.slug ?? '');
   }, [dispatch, serverProduct]);
 
-  // открывать редактор вариантов, если их нет
   useEffect(() => {
     setEditorOpen((data.variants?.length ?? 0) === 0);
   }, [data.variants.length]);
 
-  // dirty-снапшот (считается в хукe, предупреждений от exhaustive-deps нет)
   const { isDirty, initialRef, comparable } = useDirtySnapshot(serverProduct, data, slug);
 
   // предупреждение при закрытии, если есть изменения
@@ -119,7 +115,7 @@ export default function ProductForm({
         null,
       coverId: data.coverId ?? null,
       imageIds: data.images.map((m) => m.id),
-      slug: slugify(slug || data.name || ''),
+      slug: makeSlug(slug || data.name || ''),
       variants: data.variants.map((v, i) => ({
         id: v.id,
         label: v.label ?? null,
@@ -160,16 +156,14 @@ export default function ProductForm({
     }
   };
 
-  // превью SEO
   const SITE = process.env.NEXT_PUBLIC_SITE_URL || 'https://alcotrade.com.ua';
   const previewTitle = (data.seoTitle || data.name || '').trim() || 'Мета-заголовок';
   const previewDesc =
     (data.seoDescription || data.description || '').trim().slice(0, 160) || 'Опис продукту';
   const previewSlug =
-    (slug ? slugify(slug) : data.name ? slugify(data.name) : 'posylannya-na-produkt') ||
+    (slug ? makeSlug(slug) : data.name ? makeSlug(data.name) : 'posylannya-na-produkt') ||
     'posylannya-na-produkt';
 
-  // отмена
   const resetToServer = () => {
     dispatch(hydrateFromServer(serverProduct ?? {}));
     setSlug(serverProduct?.slug ?? '');
@@ -178,7 +172,6 @@ export default function ProductForm({
 
   return (
     <div className="px-4 pt-4 md:px-6">
-      {/* sticky bar */}
       {isDirty && (
         <div className="fixed inset-x-0 bottom-5 z-40">
           <div className="mx-auto w-full max-w-6xl px-4">
@@ -277,7 +270,7 @@ export default function ProductForm({
               onChange={(e) => {
                 const value = e.target.value;
                 dispatch(setField({ key: 'name', value }));
-                if (!slugTouchedRef.current) setSlug(slugify(value));
+                if (!slugTouchedRef.current) setSlug(makeSlug(value));
               }}
               aria-invalid={!!errors.name}
             />
@@ -351,7 +344,7 @@ export default function ProductForm({
                   slugTouchedRef.current = true;
                   setSlug(e.target.value);
                 }}
-                onBlur={() => setSlug((s) => slugify(s))}
+                onBlur={() => setSlug((s) => makeSlug(s))}
                 aria-invalid={!!errors.slug}
               />
               {errors.slug && <p className="text-destructive mt-1 text-xs">{errors.slug}</p>}

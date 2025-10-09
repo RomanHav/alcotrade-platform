@@ -1,8 +1,9 @@
+// src/app/(protected)/brands/page.tsx
 import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import BrandsTable from './_components/BrandsTable';
-import { Prisma, BrandStatus } from '@prisma/client';
+import type { Prisma, BrandStatus } from '@prisma/client';
 
 export const revalidate = 0;
 
@@ -37,11 +38,12 @@ export default async function BrandsPage({ searchParams }: { searchParams: Promi
       orderBy = { status: 'asc' };
       break;
     case 'updated':
+    case 'updated_desc':
       orderBy = { updatedAt: 'desc' };
       break;
   }
 
-  const [total, items] = await Promise.all([
+  const [total, items, brandOptions] = await Promise.all([
     prisma.brand.count({ where }),
     prisma.brand.findMany({
       where,
@@ -57,6 +59,10 @@ export default async function BrandsPage({ searchParams }: { searchParams: Promi
         cover: { select: { url: true, alt: true } },
       },
     }),
+    prisma.brand.findMany({
+      select: { id: true, name: true },
+      orderBy: { name: 'asc' },
+    }),
   ]);
 
   return (
@@ -67,7 +73,14 @@ export default async function BrandsPage({ searchParams }: { searchParams: Promi
           Додати новий
         </a>
       </div>
-      <BrandsTable items={items} total={total} page={page} pageSize={pageSize} />
+
+      <BrandsTable
+        items={items}
+        total={total}
+        page={page}
+        pageSize={pageSize}
+        brandOptions={brandOptions}
+      />
     </div>
   );
 }
