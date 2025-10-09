@@ -1,7 +1,6 @@
 'use client';
 import * as React from 'react';
 import { ColumnDef } from '@tanstack/react-table';
-import { Button } from '@/components/ui/button';
 import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 import { ImageCell } from '../cells/ImageCell';
 import { NameCell } from '../cells/NameCell';
@@ -21,15 +20,23 @@ export function makeColumns(opts: EditOptions): ColumnDef<Partner>[] {
     {
       id: 'select',
       size: COL_WIDTHS.select,
-      header: ({ table }) => <SelectAllCheckbox table={table} />,
-      cell: ({ row }) => <RowCheckbox row={row} />,
+      header: ({ table }) => (
+        <div className="flex w-full justify-start">
+          <SelectAllCheckbox table={table} />
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="flex w-full justify-start">
+          <RowCheckbox row={row} />
+        </div>
+      ),
       enableHiding: false,
       enableSorting: false,
       enableColumnFilter: false,
     },
     {
       accessorKey: 'image',
-      header: 'Зображення',
+      header: () => <div className="text-left">Зображення</div>,
       size: COL_WIDTHS.image,
       enableSorting: false,
       enableColumnFilter: false,
@@ -44,7 +51,6 @@ export function makeColumns(opts: EditOptions): ColumnDef<Partner>[] {
           try {
             const fromUrl = extractCloudinaryPublicId(currentUrl);
             const publicId = fromUrl ?? `Alcotrade/partners/${r.id}`;
-
             if (!onUploadImage) return;
             const { url } = await onUploadImage(file, { publicId });
             onDraftChange(r.id, 'image', url);
@@ -54,7 +60,7 @@ export function makeColumns(opts: EditOptions): ColumnDef<Partner>[] {
         };
 
         return (
-          <div className="flex w-full items-center justify-center">
+          <div className="flex w-full items-center justify-start">
             <div className="w-10">
               <ImageCell src={currentUrl} alt={alt} editing={isEditing} onPickFile={handlePick} />
             </div>
@@ -62,29 +68,36 @@ export function makeColumns(opts: EditOptions): ColumnDef<Partner>[] {
         );
       },
     },
+
     {
       accessorKey: 'name',
+      size: COL_WIDTHS.name,
       header: ({ column }) => {
         const isSorted = column.getIsSorted();
         return (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(isSorted === 'asc')}
-            className="mx-auto flex cursor-pointer items-center justify-center gap-1 px-0 font-medium"
-          >
-            Назва партнера
-            {isSorted === 'asc' ? (
-              <ArrowUp className="h-4 w-4" />
-            ) : isSorted === 'desc' ? (
-              <ArrowDown className="h-4 w-4" />
-            ) : (
-              <ArrowUpDown className="h-4 w-4 opacity-60" />
-            )}
-          </Button>
+          <div className="flex w-full items-center justify-start gap-1">
+            <span>Назва партнера</span>
+            <button
+              onClick={() => column.toggleSorting(isSorted === 'asc')}
+              className="p-1 font-medium"
+            >
+              {isSorted === 'asc' ? (
+                <ArrowUp className="h-4 w-4" />
+              ) : isSorted === 'desc' ? (
+                <ArrowDown className="h-4 w-4" />
+              ) : (
+                <ArrowUpDown className="h-4 w-4 opacity-60" />
+              )}
+            </button>
+          </div>
         );
       },
-      size: COL_WIDTHS.name,
       sortingFn: (a, b, id) => {
+        // 🔒 Не чіпаємо порядок, якщо бере участь тимчасовий рядок (tmp_)
+        const aTmp = String(a.original.id).startsWith('tmp_');
+        const bTmp = String(b.original.id).startsWith('tmp_');
+        if (aTmp || bTmp) return 0; // зберігає початкову позицію tmp-рядка (перша)
+
         const na = String(a.getValue(id) ?? '')
           .replace(/\./g, '')
           .trim();
@@ -99,7 +112,7 @@ export function makeColumns(opts: EditOptions): ColumnDef<Partner>[] {
         const draft = drafts[r.id] ?? {};
         const value = String(isEditing ? (draft.name ?? r.name) : r.name);
         return (
-          <div className="w-full max-w-full">
+          <div className="w-full max-w-full text-left font-medium">
             <NameCell
               value={value}
               editing={isEditing}
@@ -109,9 +122,10 @@ export function makeColumns(opts: EditOptions): ColumnDef<Partner>[] {
         );
       },
     },
+
     {
       accessorKey: 'link',
-      header: 'Посилання',
+      header: () => <div className="text-left">Посилання</div>,
       size: COL_WIDTHS.link,
       enableSorting: false,
       cell: ({ row }) => {
@@ -120,7 +134,7 @@ export function makeColumns(opts: EditOptions): ColumnDef<Partner>[] {
         const draft = drafts[r.id] ?? {};
         const value = (isEditing ? draft.link : r.link) ?? '';
         return (
-          <div className="w/full max-w-full">
+          <div className="w-full max-w-full text-left font-medium">
             <LinkCell
               value={value}
               editing={isEditing}
@@ -130,9 +144,10 @@ export function makeColumns(opts: EditOptions): ColumnDef<Partner>[] {
         );
       },
     },
+
     {
       id: 'actions',
-      header: 'Дії',
+      header: () => <div className="text-left">Редагувати</div>,
       size: COL_WIDTHS.actions,
       enableHiding: false,
       enableSorting: false,
@@ -140,13 +155,15 @@ export function makeColumns(opts: EditOptions): ColumnDef<Partner>[] {
         const r = row.original;
         const isEditing = r.id === editingId;
         return (
-          <ActionCell
-            partner={r}
-            editing={isEditing}
-            onStartEdit={onStartEdit}
-            onCancelEdit={onCancelEdit}
-            onSaveEdit={onSaveEdit}
-          />
+          <div className="flex w-full justify-start">
+            <ActionCell
+              partner={r}
+              editing={isEditing}
+              onStartEdit={onStartEdit}
+              onCancelEdit={onCancelEdit}
+              onSaveEdit={onSaveEdit}
+            />
+          </div>
         );
       },
     },

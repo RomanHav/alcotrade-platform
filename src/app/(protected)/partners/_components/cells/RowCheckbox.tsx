@@ -6,6 +6,8 @@ import type { Row } from '@tanstack/react-table';
 import type { Partner } from '../core/types';
 
 export function RowCheckbox({ row }: { row: Row<Partner> }) {
+  if (!row.getCanSelect()) return <div className="h-5" />;
+
   const some = row.getIsSomeSelected();
   const selected = row.getIsSelected();
 

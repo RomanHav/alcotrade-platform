@@ -13,6 +13,19 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 
+type Props = {
+  trigger: React.ReactNode;
+  title: string;
+  description?: string;
+  confirmText?: string;
+  cancelText?: string;
+  onConfirm: () => void | Promise<void>;
+  disabled?: boolean;
+
+  open?: boolean;
+  onOpenChange?: (v: boolean) => void;
+};
+
 export default function ConfirmDialog({
   trigger,
   title,
@@ -21,30 +34,34 @@ export default function ConfirmDialog({
   cancelText = 'Скасувати',
   onConfirm,
   disabled,
-}: {
-  trigger: React.ReactNode;
-  title: string;
-  description?: string;
-  confirmText?: string;
-  cancelText?: string;
-  onConfirm: () => void | Promise<void>;
-  disabled?: boolean;
-}) {
-  const [open, setOpen] = React.useState(false);
+  open,                
+  onOpenChange,         
+}: Props) {
+  const isControlled = typeof open === 'boolean';
+
+  const [internalOpen, setInternalOpen] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
+
+  const effectiveOpen = isControlled ? open! : internalOpen;
+
+  const setOpenSafe = (v: boolean) => {
+    if (disabled) return;
+    if (isControlled) onOpenChange?.(v);
+    else setInternalOpen(v);
+  };
 
   const handleConfirm = async () => {
     try {
       setLoading(true);
       await onConfirm();
-      setOpen(false);
+      setOpenSafe(false);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <AlertDialog open={open} onOpenChange={(v) => !disabled && setOpen(v)}>
+    <AlertDialog open={effectiveOpen} onOpenChange={setOpenSafe}>
       <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
