@@ -22,17 +22,18 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { X, Pencil, Trash2 } from 'lucide-react';
+import { X, Pencil } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { clearSelection, setSelectedIds } from '@/store/slices/productsUiSlice';
 import StatusBadge from './StatusBadge';
-import IndeterminateCheckbox from './IndeterminateCheckbox';
+import IndeterminateCheckbox from '../../../../../components/common/IndeterminateCheckbox';
 import FilterSheet from './FilterSheet';
 import SortSheet from './SortSheet';
 import ConfirmDeleteDialog from '@/components/common/ConfirmDeleteDialog';
 import { deleteProductsBulk } from '@/store/operations/products';
 import { toast } from 'sonner';
 import { AnimatePresence, motion } from 'framer-motion';
+import SelectionBar from '@/components/common/SelectionBar';
 
 type Item = {
   id: string;
@@ -374,31 +375,12 @@ export default function ProductsTable({
       </motion.div>
 
       {/* selection bar */}
-      <AnimatePresence>
-        {selectedIds.length > 0 && (
-          <motion.div
-            key="selection-bar"
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="bg-muted/40 mb-2 flex items-center justify-between rounded-lg border px-3 py-2 shadow-sm"
-          >
-            <div className="text-sm">
-              Обрано: <b>{selectedIds.length}</b>{' '}
-              <button
-                className="underline opacity-70 transition-opacity hover:opacity-100"
-                onClick={() => dispatch(clearSelection())}
-              >
-                Очистити
-              </button>
-            </div>
-            <Button variant="destructive" onClick={() => setShowDelete(true)}>
-              <Trash2 className="mr-2 size-4" /> Видалити
-            </Button>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <SelectionBar
+        visible={selectedIds.length > 0}
+        count={selectedIds.length}
+        onClear={() => dispatch(clearSelection())}
+        onDelete={() => setShowDelete(true)}
+      />
 
       {/* table */}
       <motion.div layout className="overflow-x-auto rounded-lg border">

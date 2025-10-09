@@ -11,21 +11,16 @@ type SP = Record<string, string | string[] | undefined>;
 
 function isSP(v: unknown): v is SP {
   if (!v || typeof v !== 'object') return false;
-  
+
   return Object.values(v as Record<string, unknown>).every(
     (val) =>
       typeof val === 'string' ||
-      Array.isArray(val) && val.every((x) => typeof x === 'string') ||
-      typeof val === 'undefined'
+      (Array.isArray(val) && val.every((x) => typeof x === 'string')) ||
+      typeof val === 'undefined',
   );
 }
 
-export default async function Page({
-  searchParams,
-}: {
-
-  searchParams?: Promise<unknown>;
-}) {
+export default async function Page({ searchParams }: { searchParams?: Promise<unknown> }) {
   const session = await auth();
   if (session?.user) redirect('/dashboard');
 
@@ -37,7 +32,6 @@ export default async function Page({
   return (
     <div className="flex w-full flex-col items-center gap-24 p-5">
       <div className="relative h-[166px] w-[250px]">
-        
         <Image
           src="/logo.svg"
           alt="Logo"
@@ -46,13 +40,13 @@ export default async function Page({
           className="block dark:hidden"
           priority
         />
-       
+
         <Image
           src="/dark-logo.svg"
           alt="Logo dark"
           width={250}
           height={166}
-          className="hidden dark:block"
+          className="hidden h-auto w-auto dark:block"
           priority
         />
       </div>

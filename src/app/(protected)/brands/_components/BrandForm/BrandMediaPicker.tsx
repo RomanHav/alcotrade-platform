@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Trash2, Upload } from 'lucide-react';

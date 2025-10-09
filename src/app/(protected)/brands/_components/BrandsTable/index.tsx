@@ -1,3 +1,4 @@
+// src/app/(protected)/brands/_components/BrandsTable.tsx
 'use client';
 
 import * as React from 'react';
@@ -5,12 +6,12 @@ import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ColumnDef,
-  getCoreRowModel,
-  getSortedRowModel,
-  useReactTable,
   RowSelectionState,
   SortingState,
   flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  useReactTable,
 } from '@tanstack/react-table';
 import {
   Table,
@@ -20,10 +21,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { X, Pencil } from 'lucide-react';
+import ConfirmDeleteDialog from '@/components/common/ConfirmDeleteDialog';
+import IndeterminateCheckbox from '@/components/common/IndeterminateCheckbox';
+import SelectionBar from '@/components/common/SelectionBar';
+import { toast } from 'sonner';
+import { SlidersHorizontal, Filter } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
@@ -33,8 +38,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { deleteBrand } from '@/store/operations/brands';
+import { useAppDispatch } from '@/store/hooks';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Trash2, Pencil, Filter, SlidersHorizontal } from 'lucide-react';
+import ResolveBrandDeletionDialog from '@/components/common/ResolveBrandDeletionDialog';
 
 type Item = {
   id: string;
@@ -44,30 +52,54 @@ type Item = {
   cover?: { url: string | null; alt?: string | null } | null;
 };
 
-export default function BrandsTable(props: {
+type BrandLite = { id: string; name: string };
+
+export default function BrandsTable({
+  items,
+  total,
+  page,
+  pageSize,
+  brandOptions,
+}: {
   items: Item[];
   total: number;
   page: number;
   pageSize: number;
+  brandOptions: BrandLite[];
 }) {
-  const { items, total, page, pageSize } = props;
-  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
-  const [sorting, setSorting] = React.useState<SortingState>([]);
   const router = useRouter();
   const sp = useSearchParams();
+  const dispatch = useAppDispatch();
+
+  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
+  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [showDelete, setShowDelete] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
+  const [resolving, setResolving] = React.useState(false);
+  const [resolverOpen, setResolverOpen] = React.useState(false);
+  const [conflicts, setConflicts] = React.useState<Array<{ id: string; count: number }>>([]);
 
   const columns: ColumnDef<Item>[] = [
     {
       id: 'select',
-      header: ({ table }) => (
-        <Checkbox
-          checked={table.getIsAllPageRowsSelected()}
-          onCheckedChange={(v) => table.toggleAllPageRowsSelected(!!v)}
-          aria-label="Вибрати всі"
-        />
-      ),
+      header: ({ table }) => {
+        const all = table.getIsAllPageRowsSelected();
+        const some = table.getIsSomePageRowsSelected();
+        return (
+          <IndeterminateCheckbox
+            checked={all}
+            indeterminate={some && !all}
+            onChange={(v) => table.toggleAllPageRowsSelected(v)}
+            title="Вибрати всі"
+          />
+        );
+      },
       cell: ({ row }) => (
-        <Checkbox checked={row.getIsSelected()} onCheckedChange={(v) => row.toggleSelected(!!v)} />
+        <IndeterminateCheckbox
+          checked={row.getIsSelected()}
+          onChange={(v) => row.toggleSelected(v)}
+          title="Вибрати"
+        />
       ),
       size: 32,
     },
@@ -123,11 +155,12 @@ export default function BrandsTable(props: {
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
+    getRowId: (row) => row.id,
   });
 
   const selectedIds = React.useMemo(
     () => table.getSelectedRowModel().rows.map((r) => r.original.id),
-    [table],
+    [rowSelection, items],
   );
 
   const applyParam = (key: string, value?: string) => {
@@ -140,18 +173,53 @@ export default function BrandsTable(props: {
 
   const onBulkDelete = async () => {
     if (!selectedIds.length) return;
-    await fetch('/api/brands', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids: selectedIds }),
-    });
-    router.refresh();
+    setDeleting(true);
+    try {
+      await dispatch(deleteBrand({ ids: selectedIds, mode: 'restrict' })).unwrap();
+      setShowDelete(false);
+      table.resetRowSelection();
+      toast.success('Видалено', { description: `Брендів: ${selectedIds.length}` });
+      router.refresh();
+    } catch (e: any) {
+      // поймали конфликт
+      if (e?.code === 'HAS_PRODUCTS' && Array.isArray(e.conflicts)) {
+        setConflicts(e.conflicts);
+        setShowDelete(false);
+        setResolverOpen(true);
+      } else {
+        toast.error('Не вдалося видалити', { description: e?.message ?? 'Спробуйте ще раз' });
+      }
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const resolveDeletion = async (p: { mode: 'cascade' | 'reassign'; reassignToId?: string }) => {
+    setResolving(true);
+    try {
+      await dispatch(deleteBrand({ ids: selectedIds, ...p })).unwrap();
+      setResolverOpen(false);
+      table.resetRowSelection();
+      toast.success('Готово', { description: 'Операція завершена' });
+      router.refresh();
+    } catch (e: any) {
+      toast.error('Помилка', { description: e?.message ?? 'Спробуйте ще раз' });
+    } finally {
+      setResolving(false);
+    }
   };
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
+  // активні фільтри
+  const activeFilters: { label: string; key: string }[] = [];
+  if (sp.get('query'))
+    activeFilters.push({ label: `Назва бренду: ${sp.get('query')}`, key: 'query' });
+  if (sp.get('status')) activeFilters.push({ label: `Статус: ${sp.get('status')}`, key: 'status' });
+
   return (
     <div className="bg-card rounded-2xl border p-3 shadow-sm">
+      {/* верхняя панель */}
       <div className="mb-3 flex items-center gap-2">
         <Input
           placeholder="Пошук"
@@ -163,6 +231,7 @@ export default function BrandsTable(props: {
           className="w-56"
         />
 
+        {/* Фільтри */}
         <Sheet>
           <SheetTrigger asChild>
             <Button variant="outline">
@@ -208,6 +277,7 @@ export default function BrandsTable(props: {
           </SheetContent>
         </Sheet>
 
+        {/* Сортування */}
         <Sheet>
           <SheetTrigger asChild>
             <Button variant="outline">
@@ -241,16 +311,42 @@ export default function BrandsTable(props: {
             </div>
           </SheetContent>
         </Sheet>
-
-        <div className="ml-auto flex items-center gap-2">
-          {selectedIds.length > 0 && (
-            <Button variant="destructive" onClick={onBulkDelete}>
-              <Trash2 className="mr-2 size-4" /> Видалити
-            </Button>
-          )}
-        </div>
       </div>
 
+      {/* активні фільтри */}
+      <div className="mb-2 flex flex-wrap items-center gap-3">
+        {activeFilters.length > 0 && (
+          <>
+            <span className="text-sm">Фільтри:</span>
+            {activeFilters.map((f) => (
+              <span
+                key={f.key}
+                className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs"
+              >
+                {f.label}
+                <button
+                  className="opacity-70 hover:opacity-100"
+                  onClick={() => applyParam(f.key, undefined)}
+                  title="Очистити"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </span>
+            ))}
+          </>
+        )}
+      </div>
+
+      {/* selection bar (общий) */}
+      <SelectionBar
+        visible={selectedIds.length > 0}
+        count={selectedIds.length}
+        onClear={() => table.resetRowSelection()}
+        onDelete={() => setShowDelete(true)}
+        deleteLabel="Видалити"
+      />
+
+      {/* таблица */}
       <div className="overflow-x-auto rounded-lg border">
         <Table>
           <TableHeader>
@@ -278,6 +374,7 @@ export default function BrandsTable(props: {
         </Table>
       </div>
 
+      {/* пагінація */}
       <div className="mt-3 flex items-center justify-center gap-2 text-sm">
         <Button
           variant="ghost"
@@ -297,6 +394,28 @@ export default function BrandsTable(props: {
           »
         </Button>
       </div>
+
+      {/* confirm */}
+      <ConfirmDeleteDialog
+        open={showDelete}
+        onOpenChange={setShowDelete}
+        title={
+          selectedIds.length > 1 ? `Видалити ${selectedIds.length} брендів?` : 'Видалити бренд?'
+        }
+        description="Дію неможливо скасувати."
+        confirmLabel="Видалити"
+        loading={deleting}
+        onConfirm={onBulkDelete}
+      />
+
+      <ResolveBrandDeletionDialog
+        open={resolverOpen}
+        onOpenChange={setResolverOpen}
+        conflicts={conflicts}
+        brands={brandOptions}
+        loading={resolving}
+        onResolve={resolveDeletion}
+      />
     </div>
   );
 }
