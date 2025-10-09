@@ -136,7 +136,9 @@ export default function BrandForm({
     if (!data.id) return setShowDelete(false);
     setDeleting(true);
     try {
-      await dispatch(deleteBrand({ id: data.id })).unwrap();
+      await dispatch(
+        deleteBrand({ ids: [data.id], mode: 'restrict' }), // ⬅️ важно: ids массив
+      ).unwrap();
       toast.success('Видалено', { description: 'Бренд успішно видалено.' });
       router.push('/brands');
     } catch (e: any) {
