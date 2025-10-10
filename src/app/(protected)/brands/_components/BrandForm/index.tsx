@@ -27,6 +27,9 @@ import ConfirmDeleteDialog from '@/components/common/ConfirmDeleteDialog';
 import { saveBrand, deleteBrand } from '@/store/operations/brands';
 import { useDirtyBrandSnapshot } from './hooks/useDirtySnapshot';
 import { slug as makeSlug } from '@/lib/slug';
+import ResolveBrandDeletionDialog from '@/components/common/ResolveBrandDeletionDialog';
+import * as React from 'react';
+import { ChevronRight } from 'lucide-react';
 
 const schema = z.object({
   id: z.string().optional(),
@@ -39,13 +42,16 @@ const schema = z.object({
 });
 
 type ProductLite = { id: string; name: string; status: 'ACTIVE' | 'DRAFT' | 'ARCHIVE' };
+type BrandOption = { id: string; name: string };
 
 export default function BrandForm({
   serverBrand,
   products,
+  brandsForReassign = [],
 }: {
-  serverBrand?: Partial<BrandFormState> & { slug?: string | null }; // 👈
+  serverBrand?: Partial<BrandFormState> & { slug?: string | null };
   products: ProductLite[];
+  brandsForReassign?: BrandOption[];
 }) {
   const router = useRouter();
   const dispatch = useAppDispatch();
@@ -54,6 +60,10 @@ export default function BrandForm({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
+  const [resolverOpen, setResolverOpen] = useState(false);
+  const [conflicts, setConflicts] = useState<Array<{ id: string; count: number }>>([]);
+  const [resolving, setResolving] = useState(false);
+  const [brandOptions, setBrandOptions] = useState<BrandOption[]>(brandsForReassign);
 
   // slug
   const [slug, setSlug] = useState<string>(serverBrand?.slug ?? '');
@@ -94,7 +104,32 @@ export default function BrandForm({
     }
     return true;
   };
-
+  const resolveDeletion = async ({
+    mode,
+    reassignToId,
+  }: {
+    mode: 'cascade' | 'reassign';
+    reassignToId?: string;
+  }) => {
+    if (!data.id) return;
+    setResolving(true);
+    try {
+      await dispatch(
+        deleteBrand({
+          ids: [data.id],
+          mode,
+          reassignToId, // придёт только для 'reassign'
+        }),
+      ).unwrap();
+      toast.success('Видалено', { description: 'Бренд успішно видалено.' });
+      router.push('/brands');
+    } catch (e: any) {
+      toast.error('Не вдалося видалити', { description: e?.message ?? 'Спробуйте ще раз.' });
+    } finally {
+      setResolving(false);
+      setResolverOpen(false);
+    }
+  };
   // save via thunk
   const onSave = async () => {
     if (saving || !isDirty) return;
@@ -136,13 +171,17 @@ export default function BrandForm({
     if (!data.id) return setShowDelete(false);
     setDeleting(true);
     try {
-      await dispatch(
-        deleteBrand({ ids: [data.id], mode: 'restrict' }), // ⬅️ важно: ids массив
-      ).unwrap();
+      await dispatch(deleteBrand({ ids: [data.id], mode: 'restrict' })).unwrap();
       toast.success('Видалено', { description: 'Бренд успішно видалено.' });
       router.push('/brands');
     } catch (e: any) {
-      toast.error('Не вдалося видалити', { description: e?.message ?? 'Спробуйте ще раз.' });
+      if (e?.code === 'HAS_PRODUCTS' && Array.isArray(e?.conflicts)) {
+        setConflicts(e.conflicts);
+        setResolverOpen(true);
+        setShowDelete(false);
+      } else {
+        toast.error('Не вдалося видалити', { description: e?.message ?? 'Спробуйте ще раз.' });
+      }
     } finally {
       setDeleting(false);
     }
@@ -169,17 +208,17 @@ export default function BrandForm({
       <UnsavedBar visible={isDirty} onCancel={resetToServer} onSave={onSave} saving={saving} />
 
       {/* breadcrumbs */}
-      <div className="mb-1 text-sm">
+      <div className="mb-5 flex items-center gap-2.5 text-xl font-extralight">
         <Link href="/brands" className="underline-offset-4 hover:underline">
           Бренди
         </Link>{' '}
-        <span className="opacity-60">›</span>{' '}
+        <ChevronRight className="h-5 w-5 opacity-60" />
         <span className="opacity-80">{data.name?.trim() || 'Назва бренду'}</span>
       </div>
 
       {/* header */}
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{data.id ? 'Редагувати бренд' : 'Новий бренд'}</h1>
+      <div className="mb-9 flex items-center justify-between">
+        <h1 className="text-4xl font-semibold">{data.id ? 'Редагувати бренд' : 'Новий бренд'}</h1>
         <div className="flex gap-2">
           {isDirty && (
             <Button variant="outline" onClick={resetToServer}>
@@ -342,6 +381,14 @@ export default function BrandForm({
               confirmLabel="Підтвердити"
               loading={deleting}
               onConfirm={onDelete}
+            />
+            <ResolveBrandDeletionDialog
+              open={resolverOpen}
+              onOpenChange={setResolverOpen}
+              conflicts={conflicts}
+              brands={brandOptions}
+              loading={resolving}
+              onResolve={resolveDeletion}
             />
           </>
         )}

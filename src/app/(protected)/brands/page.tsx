@@ -66,12 +66,9 @@ export default async function BrandsPage({ searchParams }: { searchParams: Promi
   ]);
 
   return (
-    <div className="px-4 pt-6 md:px-6">
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Бренди</h1>
-        <a href="/brands/new" className="btn btn-primary">
-          Додати новий
-        </a>
+    <div className="px-8 pt-16">
+      <div className="mb-9 flex items-center justify-between">
+        <h1 className="text-4xl font-semibold">Бренди</h1>
       </div>
 
       <BrandsTable

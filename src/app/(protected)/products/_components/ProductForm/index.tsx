@@ -27,6 +27,7 @@ import { slug as makeSlug } from '@/lib/slug';
 import { useDirtySnapshot } from './hooks/useDirtySnapshot';
 import { saveProduct, deleteProduct } from '@/store/operations/products';
 import ConfirmDeleteDialog from '@/components/common/ConfirmDeleteDialog';
+import { ChevronRight } from 'lucide-react';
 
 type Brand = { id: string; name: string };
 
@@ -193,17 +194,17 @@ export default function ProductForm({
       )}
 
       {/* breadcrumbs */}
-      <div className="mb-1 text-sm">
+      <div className="mb-5 flex items-center gap-2.5 text-xl font-extralight">
         <Link href="/products" className="underline-offset-4 hover:underline">
           Продукти
         </Link>{' '}
-        <span className="opacity-60">›</span>{' '}
+        <ChevronRight className="h-5 w-5 opacity-60" />{' '}
         <span className="opacity-80">{data.name?.trim() || 'Назва продукту'}</span>
       </div>
 
       {/* header */}
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">
+      <div className="mb-9 flex items-center justify-between">
+        <h1 className="text-4xl font-semibold">
           {data.id ? 'Редагувати продукт' : 'Новий продукт'}
         </h1>
         <div className="flex gap-2">
