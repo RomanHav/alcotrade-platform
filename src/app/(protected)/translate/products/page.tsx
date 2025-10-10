@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
-import ProductList from './_components/ProductList';
+// import ProductList from './_components/ProductList';
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
 
@@ -38,7 +38,7 @@ export default async function ProductTranslate() {
       </div>
       <div className="flex flex-col gap-8 rounded-2xl border border-neutral-200 bg-neutral-50 p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
         <h2 className="text-2xl font-medium">Продукти</h2>
-        <ProductList />
+        {/* <ProductList /> */}
       </div>
     </div>
   );
