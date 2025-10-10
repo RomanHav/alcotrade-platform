@@ -1,6 +1,5 @@
-import { Home, Package, Newspaper, Users } from 'lucide-react';
+import { Home, Package, Newspaper, Users, Languages } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import TranslateIcon from '@/components/icons/translate';
 import type { ComponentType, SVGProps } from 'react';
 
 type SvgIcon = ComponentType<SVGProps<SVGSVGElement>>;
@@ -24,5 +23,5 @@ export const navItems: NavItem[] = [
   },
   { label: 'Новини', href: '/news', icon: Newspaper },
   { label: 'Партнери', href: '/partners', icon: Users },
-  { label: 'Вигляд та переклад', href: '/translate', icon: TranslateIcon },
+  { label: 'Вигляд та переклад', href: '/translate', icon: Languages },
 ];
