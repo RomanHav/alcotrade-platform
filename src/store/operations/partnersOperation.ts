@@ -29,10 +29,12 @@ export const savePartnerRow = createAsyncThunk<Partner, { id: string }, { state:
     const linkStr = typeof d.link === 'string' ? d.link.trim() : '';
     const imageStr = typeof d.image === 'string' ? d.image.trim() : '';
 
+    if (!imageStr) throw new Error('Зображення партнера не може бути порожнім');
+
     const payload = {
       name,
       link: linkStr ? linkStr : null,
-      image: imageStr ? imageStr : null,
+      image: imageStr,
     };
 
     if (id.startsWith('tmp_')) {

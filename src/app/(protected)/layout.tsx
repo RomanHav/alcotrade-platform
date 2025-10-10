@@ -37,7 +37,7 @@ export default async function ProtectedLayout({ children }: { children: ReactNod
           <main className="flex-1 p-4">{children}</main>
         </div>
       </div>
-      <Toaster />
+      <Toaster closeButton/>
     </Providers>
   );
 }

@@ -118,13 +118,17 @@ const partnersSlice = createSlice({
         const id = action.meta.arg.id;
         const d = state.drafts[id];
         if (!d) return;
+
         const name = String(d.name ?? '').trim();
-        if (!name) return;
+        const image = String(d.image ?? '').trim();
+
+        if (!name || !image) return;
+
         const optimistic: Partner = {
           id,
           name,
-          link: (d.link ?? '') || null,
-          image: (d.image ?? '') || null,
+          link: typeof d.link === 'string' && d.link.trim() ? d.link.trim() : null,
+          image,
         };
         state.items = state.items.map((p) => (p.id === id ? optimistic : p));
       })
