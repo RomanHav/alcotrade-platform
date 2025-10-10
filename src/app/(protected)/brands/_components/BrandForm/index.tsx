@@ -29,6 +29,7 @@ import { useDirtyBrandSnapshot } from './hooks/useDirtySnapshot';
 import { slug as makeSlug } from '@/lib/slug';
 import ResolveBrandDeletionDialog from '@/components/common/ResolveBrandDeletionDialog';
 import * as React from 'react';
+import { ChevronRight } from 'lucide-react';
 
 const schema = z.object({
   id: z.string().optional(),
@@ -207,17 +208,17 @@ export default function BrandForm({
       <UnsavedBar visible={isDirty} onCancel={resetToServer} onSave={onSave} saving={saving} />
 
       {/* breadcrumbs */}
-      <div className="mb-1 text-sm">
+      <div className="mb-5 flex items-center gap-2.5 text-xl font-extralight">
         <Link href="/brands" className="underline-offset-4 hover:underline">
           Бренди
         </Link>{' '}
-        <span className="opacity-60">›</span>{' '}
+        <ChevronRight className="h-5 w-5 opacity-60" />
         <span className="opacity-80">{data.name?.trim() || 'Назва бренду'}</span>
       </div>
 
       {/* header */}
-      <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">{data.id ? 'Редагувати бренд' : 'Новий бренд'}</h1>
+      <div className="mb-9 flex items-center justify-between">
+        <h1 className="text-4xl font-semibold">{data.id ? 'Редагувати бренд' : 'Новий бренд'}</h1>
         <div className="flex gap-2">
           {isDirty && (
             <Button variant="outline" onClick={resetToServer}>

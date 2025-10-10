@@ -115,6 +115,9 @@ model MediaAsset {
 
   Partner        Partner[]        @relation(name: "PartnerLogo")
   ProductVariant ProductVariant[]
+
+  ArticleImage ArticleImage[]
+  Article      Article[]
 }
 
 model Product {
@@ -217,4 +220,53 @@ model Partner {
   updatedAt DateTime @updatedAt
 
   @@index([name])
+}
+
+// NEW
+enum NewsStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVE
+}
+
+model Article {
+  id String @id @default(cuid())
+
+  title   String
+  excerpt String?    @db.VarChar(300) // короткий опис під превʼю (опц.)
+  content String?    @db.Text // детальний опис/контент
+  date    DateTime? // поле "Дата" у формі (для показу/сорту)
+  status  NewsStatus @default(DRAFT)
+
+  slug   String
+  locale String @default("uk") @db.VarChar(5)
+
+  seoTitle       String? @db.VarChar(60)
+  seoDescription String? @db.VarChar(160)
+
+  coverId String?
+  cover   MediaAsset?    @relation(fields: [coverId], references: [id], onDelete: SetNull)
+  images  ArticleImage[]
+
+  publishedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([slug, locale])
+  @@index([status])
+  @@index([date])
+  @@index([publishedAt])
+}
+
+model ArticleImage {
+  articleId String
+  mediaId   String
+  position  Int    @default(0)
+
+  article Article    @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  media   MediaAsset @relation(fields: [mediaId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, mediaId])
+  @@index([position])
 }
