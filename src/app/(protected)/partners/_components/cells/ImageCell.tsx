@@ -18,7 +18,7 @@ export function ImageCell({
     <div className="flex items-center justify-center">
       <div
         onClick={onClick}
-        className={['relative h-10 w-10 overflow-hidden rounded-sm border', editing ? 'cursor-pointer':'cursor-default'].join(' ')}
+        className={['relative size-10 overflow-hidden rounded-md border', editing ? 'cursor-pointer':'cursor-default'].join(' ')}
         aria-label={editing ? 'Редагувати зображення' : 'Зображення'}
       >
         {src ? <Image src={src} alt={alt || 'logo'} fill className="object-cover" />

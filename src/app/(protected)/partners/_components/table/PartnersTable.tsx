@@ -6,8 +6,8 @@ import {
   getCoreRowModel,
   getPaginationRowModel,
   getSortedRowModel,
-  type RowSelectionState,
   type SortingState,
+  type RowSelectionState,
 } from '@tanstack/react-table';
 import {
   Table,
@@ -19,43 +19,35 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { makeColumns } from './makeColumns';
-import ConfirmDialog from '../common/ConfirmDialog';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import {
-  cancelEdit,
-  draftChange,
-  startEdit,
-  setDeleting,
-  removeRowsByIds,
-} from '@/store/slices/partnersSlice';
-
-import { savePartnerRow, bulkDeletePartners } from '@/store/operations/partnersOperation';
-
+import { cancelEdit, draftChange, startEdit } from '@/store/slices/partnersSlice';
 import {
   selectPartners,
   selectEditingId,
   selectDrafts,
-  selectDeleting,
   selectSearch,
+  selectRowSelection,
 } from '@/store/selectors/partnersSelector';
-
-import { uploadPartnerLogo } from '@/store/operations/partnersOperation';
+import { setRowSelection as setRowSelectionAction } from '@/store/slices/partnersSlice';
+import { uploadPartnerLogo, savePartnerRow } from '@/store/operations/partnersOperation';
 import type { Partner } from '../core/types';
+
+import { toast } from 'sonner';
 
 export default function PartnersTable() {
   const dispatch = useAppDispatch();
   const data = useAppSelector(selectPartners);
   const editingId = useAppSelector(selectEditingId);
   const drafts = useAppSelector(selectDrafts);
-  const deleting = useAppSelector(selectDeleting);
   const search = useAppSelector(selectSearch);
+  const rowSelection = useAppSelector(selectRowSelection);
 
   const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
 
   const cancelAndMaybeRemove = React.useCallback(
     (id: string) => {
       dispatch(cancelEdit(id));
+      toast('Зміни скасовано', { description: 'Локальні правки видалено.' });
     },
     [dispatch],
   );
@@ -75,8 +67,18 @@ export default function PartnersTable() {
   );
 
   const onSaveEdit = React.useCallback(
-    (id: string) => {
-      dispatch(savePartnerRow({ id }));
+    async (id: string) => {
+      const isCreate = id.startsWith('tmp_');
+      try {
+        await dispatch(savePartnerRow({ id })).unwrap();
+        toast.success('Збережено', {
+          description: isCreate ? 'Партнера успішно додано.' : 'Партнера успішно оновлено.',
+        });
+      } catch (e: any) {
+        toast.error('Не вдалось зберегти', {
+          description: String(e?.message ?? 'Спробуйте ще раз.'),
+        });
+      }
     },
     [dispatch],
   );
@@ -135,33 +137,25 @@ export default function PartnersTable() {
   const table = useReactTable({
     data: viewData,
     columns,
+
+    getRowId: (row: Partner) => row.id,
     state: { sorting, rowSelection },
     onSortingChange: setSorting,
-    onRowSelectionChange: setRowSelection,
+    onRowSelectionChange: (updater) => {
+      const next =
+        typeof updater === 'function'
+          ? (updater as (old: RowSelectionState) => RowSelectionState)(rowSelection)
+          : updater;
+      dispatch(setRowSelectionAction(next));
+    },
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    initialState: { pagination: { pageSize: 6 } },
+    initialState: { pagination: { pageSize: 10 } },
+
+    enableRowSelection: (row) => !String(row.original.id).startsWith('tmp_'),
+    enableMultiRowSelection: true,
   });
-
-  const handleDeleteSelected = React.useCallback(async () => {
-    const ids = table.getSelectedRowModel().rows.map((r) => r.original.id);
-    if (ids.length === 0) return;
-
-    try {
-      dispatch(setDeleting(true));
-
-      dispatch(removeRowsByIds(ids));
-      table.resetRowSelection();
-      await dispatch(bulkDeletePartners({ ids })).unwrap();
-    } catch (e) {
-      console.error('Delete error:', e);
-    } finally {
-      dispatch(setDeleting(false));
-    }
-  }, [table, dispatch]);
-
-  const selectedCount = table.getSelectedRowModel().rows.length;
 
   return (
     <div className="w-full">
@@ -185,8 +179,12 @@ export default function PartnersTable() {
 
           <TableBody>
             {table.getPaginationRowModel().rows.length ? (
-              table.getPaginationRowModel().rows.map((row) => (
-                <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'}>
+              table.getPaginationRowModel().rows.map((row, i) => (
+                <TableRow
+                  className={`${i % 2 === 1 && 'bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700'} transition-colors`}
+                  key={row.id}
+                  data-state={row.getIsSelected() && 'selected'}
+                >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
                       key={cell.id}
@@ -213,36 +211,21 @@ export default function PartnersTable() {
         </Table>
       </div>
 
-      <div className="flex items-center py-4">
-        <div className="flex flex-1">
-          {selectedCount > 0 && (
-            <ConfirmDialog
-              title="Видалити обрані?"
-              description={`Буде видалено ${selectedCount} ${selectedCount === 1 ? 'партнера' : 'партнерів'}. Цю дію не можна скасувати.`}
-              confirmText="Видалити"
-              onConfirm={handleDeleteSelected}
-              disabled={deleting}
-              trigger={
-                <Button variant="destructive" disabled={deleting} className="cursor-pointer">
-                  {deleting ? 'Видаляю…' : `Видалити обрані (${selectedCount})`}
-                </Button>
-              }
-            />
-          )}
-        </div>
-
-        <span className="text-muted-foreground flex-1 text-center text-sm">
-          Сторінка {table.getState().pagination.pageIndex + 1} з {table.getPageCount() || 1}
+      {/*ПАГІНАЦІЯ*/}
+      <div className="mt-3 flex items-center justify-center gap-2 text-sm">
+        <Button
+          variant="ghost"
+          onClick={() => table.previousPage()}
+          disabled={!table.getCanPreviousPage()}
+        >
+          «
+        </Button>
+        <span>
+          {table.getState().pagination.pageIndex + 1} / {table.getPageCount() || 1}
         </span>
-
-        <div className="flex flex-1 items-center justify-end gap-3">
-          <Button onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>
-            Попередня
-          </Button>
-          <Button onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
-            Наступна
-          </Button>
-        </div>
+        <Button variant="ghost" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>
+          »
+        </Button>
       </div>
     </div>
   );

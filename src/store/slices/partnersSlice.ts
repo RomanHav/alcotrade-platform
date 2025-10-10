@@ -2,8 +2,9 @@
 import { createSlice, PayloadAction, nanoid } from '@reduxjs/toolkit';
 import type { Partner } from '@/app/(protected)/partners/_components/core/types';
 import { savePartnerRow, bulkDeletePartners } from '../operations/partnersOperation';
+import type { RowSelectionState } from '@tanstack/react-table';
 
-type Drafts = Record<string, Partial<Partner>>;
+export type Drafts = Record<string, Partial<Partner>>;
 
 type PartnersState = {
   items: Partner[];
@@ -17,6 +18,8 @@ type PartnersState = {
   drafts: Drafts;
 
   deleting: boolean;
+
+  rowSelection: RowSelectionState;
 };
 
 const initialState: PartnersState = {
@@ -31,6 +34,8 @@ const initialState: PartnersState = {
   drafts: {},
 
   deleting: false,
+
+  rowSelection: {},
 };
 
 const partnersSlice = createSlice({
@@ -39,6 +44,8 @@ const partnersSlice = createSlice({
   reducers: {
     hydrate(state, action: PayloadAction<Partner[]>) {
       state.items = action.payload;
+
+      state.rowSelection = {};
     },
     setSearch(state, action: PayloadAction<string>) {
       state.search = action.payload;
@@ -84,10 +91,25 @@ const partnersSlice = createSlice({
     },
     removeRowsByIds(state, action: PayloadAction<string[]>) {
       const ids = new Set(action.payload);
+
       state.items = state.items.filter((p) => !ids.has(p.id));
 
       action.payload.forEach((id) => delete state.drafts[id]);
+
       if (state.editingId && ids.has(state.editingId)) state.editingId = null;
+
+      const nextSel: RowSelectionState = { ...state.rowSelection };
+      for (const id of action.payload) {
+        if (nextSel[id]) delete nextSel[id];
+      }
+      state.rowSelection = nextSel;
+    },
+
+    setRowSelection(state, action: PayloadAction<RowSelectionState>) {
+      state.rowSelection = action.payload;
+    },
+    clearSelection(state) {
+      state.rowSelection = {};
     },
   },
   extraReducers(builder) {
@@ -144,6 +166,8 @@ export const {
   finishSave,
   setDeleting,
   removeRowsByIds,
+  setRowSelection,
+  clearSelection,
 } = partnersSlice.actions;
 
 export default partnersSlice.reducer;
