@@ -11,7 +11,6 @@ import { navItems, type NavItem } from '@/config/nav';
 import { BoxesIcon } from 'lucide-react';
 import { useIsDark } from './uselsDark';
 
-
 type SidebarUser = { name: string | null; role: Role; image: string };
 
 export default function Sidebar({ user, fixed = false }: { user: SidebarUser; fixed?: boolean }) {
@@ -27,7 +26,7 @@ export default function Sidebar({ user, fixed = false }: { user: SidebarUser; fi
         fixed && 'fixed inset-y-0 left-0 z-40',
       )}
     >
-      <div className="flex h-full flex-col">
+      <div className="flex h-full w-full flex-col">
         <div className="flex h-40 items-center justify-center border-b px-4">
           <Link href="/dashboard" className="font-semibold" aria-label="Home">
             <Image src={logoSrc} alt="logo" width={214} height={106} priority />
@@ -36,7 +35,7 @@ export default function Sidebar({ user, fixed = false }: { user: SidebarUser; fi
 
         <ScrollArea className="flex-1 px-6 py-8">
           <nav className="space-y-2 px-3 py-3">
-            {navItems.map((item) => {
+            {navItems.map((item, index) => {
               if (!item.children) {
                 const active =
                   item.href && (pathname === item.href || pathname.startsWith(item.href + '/'));
@@ -49,8 +48,12 @@ export default function Sidebar({ user, fixed = false }: { user: SidebarUser; fi
                       active && 'bg-accent text-accent-foreground',
                     )}
                   >
-                    <item.icon className="h-6 w-6 opacity-70 group-hover:opacity-100" />
-                    <span className="text-2xl">{item.label}</span>
+                    <item.icon
+                      className={`${active && 'opacity-100'} h-6 w-6 opacity-70 group-hover:opacity-100`}
+                    />
+                    <span className={`${index === navItems.length - 1 ? 'max-w-32' : ''} text-2xl`}>
+                      {item.label}
+                    </span>
                   </Link>
                 );
               }
@@ -94,6 +97,7 @@ function NavWithChildren({
   highlightParent: boolean;
 }) {
   const pathname = usePathname();
+  const active = item.href && (pathname === item.href || pathname.startsWith(item.href + '/'));
 
   return (
     <div className="space-y-1">
@@ -104,7 +108,9 @@ function NavWithChildren({
         )}
       >
         <Link href={item.href!} className="group flex min-w-0 flex-1 items-center gap-4">
-          <item.icon className="h-6 w-6 opacity-70 group-hover:opacity-100" />
+          <item.icon
+            className={`${active && 'opacity-100'} h-6 w-6 opacity-70 group-hover:opacity-100`}
+          />
           <span className="truncate text-2xl">{item.label}</span>
         </Link>
       </div>
@@ -115,15 +121,23 @@ function NavWithChildren({
             const childActive = pathname === c.href || pathname.startsWith(c.href + '/');
             return (
               <div key={c.href} className="relative">
-                <Image className="absolute -left-3" src="/arrow.svg" alt="arrow" width={10} height={25} />
+                <Image
+                  className="absolute -left-3"
+                  src="/arrow.svg"
+                  alt="arrow"
+                  width={10}
+                  height={25}
+                />
                 <Link
                   href={c.href}
                   className={cn(
-                    'hover:bg-accent hover:text-accent-foreground flex items-center gap-4 rounded-md px-2 py-1.5',
+                    'hover:bg-accent hover:text-accent-foreground group flex items-center gap-4 rounded-md px-2 py-1.5',
                     childActive && 'bg-accent text-accent-foreground',
                   )}
                 >
-                  <BoxesIcon />
+                  <BoxesIcon
+                    className={`${childActive && 'opacity-100'} opacity-70 group-hover:opacity-100`}
+                  />
                   <span className="text-2xl">{c.label}</span>
                 </Link>
               </div>
