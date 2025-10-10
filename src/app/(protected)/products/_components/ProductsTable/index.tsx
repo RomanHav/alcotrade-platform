@@ -34,6 +34,7 @@ import { deleteProductsBulk } from '@/store/operations/products';
 import { toast } from 'sonner';
 import { AnimatePresence, motion } from 'framer-motion';
 import SelectionBar from '@/components/common/SelectionBar';
+import Link from 'next/link';
 
 type Item = {
   id: string;
@@ -70,8 +71,6 @@ export default function ProductsTable({
   const dispatch = useAppDispatch();
   const selectedIds = useAppSelector((s) => s.productsUi.selectedIds);
 
-  /* ----------------------- sheets state + drafts ----------------------- */
-
   type FilterDraft = { query: string; status?: string; brand?: string };
 
   const [filterOpen, setFilterOpen] = React.useState(false);
@@ -93,7 +92,6 @@ export default function ProductsTable({
     setSortDraft(sp.get('sort') ?? 'name_asc');
   }, [sp.toString()]);
 
-  /* --------------------- selection <-> redux sync ---------------------- */
   const pageIds = React.useMemo(() => items.map((i) => i.id), [items]);
 
   const rowSelection = React.useMemo(() => {
@@ -151,7 +149,7 @@ export default function ProductsTable({
         id: 'thumb',
         header: () => null,
         cell: ({ row }) => (
-          <div className="size-8 overflow-hidden rounded-md border">
+          <div className="size-10 overflow-hidden rounded-md border">
             {row.original.cover?.url ? (
               <Image
                 src={row.original.cover.url}
@@ -255,7 +253,6 @@ export default function ProductsTable({
     setSortOpen(false);
   };
 
-  /* -------------------------- bulk deletion --------------------------- */
   const [showDelete, setShowDelete] = React.useState(false);
   const [deleting, setDeleting] = React.useState(false);
 
@@ -275,9 +272,6 @@ export default function ProductsTable({
     }
   };
 
-  /* ------------------------------ pagination ------------------------------ */
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
   const goToPage = (next: number) => {
     const params = new URLSearchParams(sp.toString());
     params.set('limit', String(PAGE_SIZE));
@@ -285,7 +279,6 @@ export default function ProductsTable({
     router.push(`?${params.toString()}`);
   };
 
-  /* ------------------------------ active filters ------------------------------ */
   const activeFilters: { label: string; key: string }[] = [];
   if (sp.get('brand')) {
     const b = brands.find((x) => x.slug === sp.get('brand'));
@@ -332,7 +325,7 @@ export default function ProductsTable({
 
         <div className="ml-auto flex items-center gap-2">
           <Button asChild>
-            <a href="/products/new">Додати новий</a>
+            <Link href="/products/new">Додати новий</Link>
           </Button>
         </div>
       </motion.div>

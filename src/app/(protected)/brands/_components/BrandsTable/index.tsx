@@ -43,6 +43,7 @@ import { useAppDispatch } from '@/store/hooks';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import ResolveBrandDeletionDialog from '@/components/common/ResolveBrandDeletionDialog';
+import Link from 'next/link';
 
 type Item = {
   id: string;
@@ -107,7 +108,7 @@ export default function BrandsTable({
       id: 'thumb',
       header: () => null,
       cell: ({ row }) => (
-        <div className="size-8 overflow-hidden rounded-md border">
+        <div className="size-10 overflow-hidden rounded-md border">
           {row.original.cover?.url ? (
             <Image
               src={row.original.cover.url}
@@ -181,7 +182,6 @@ export default function BrandsTable({
       toast.success('Видалено', { description: `Брендів: ${selectedIds.length}` });
       router.refresh();
     } catch (e: any) {
-      // поймали конфликт
       if (e?.code === 'HAS_PRODUCTS' && Array.isArray(e.conflicts)) {
         setConflicts(e.conflicts);
         setShowDelete(false);
@@ -211,7 +211,6 @@ export default function BrandsTable({
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
-  // активні фільтри
   const activeFilters: { label: string; key: string }[] = [];
   if (sp.get('query'))
     activeFilters.push({ label: `Назва бренду: ${sp.get('query')}`, key: 'query' });
@@ -311,6 +310,11 @@ export default function BrandsTable({
             </div>
           </SheetContent>
         </Sheet>
+        <div className="ml-auto flex items-center gap-2">
+          <Button asChild>
+            <Link href="/brands/new">Додати новий</Link>
+          </Button>
+        </div>
       </div>
 
       {/* активні фільтри */}

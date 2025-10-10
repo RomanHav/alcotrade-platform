@@ -26,7 +26,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   const session = await auth();
   if (!session?.user?.id) redirect('/sign-in?callbackUrl=/products');
 
-  const sp = await searchParams; // ✅ дождались
+  const sp = await searchParams;
   const get = (k: keyof SP) => {
     const v = sp[k as string];
     return Array.isArray(v) ? v[0] : v;

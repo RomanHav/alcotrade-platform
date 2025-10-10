@@ -14,6 +14,12 @@ export default async function EditBrandPage({ params }: { params: Promise<{ id: 
   });
   if (!brand) notFound();
 
+  const brandsForReassign = await prisma.brand.findMany({
+    where: { id: { not: id } },
+    select: { id: true, name: true },
+    orderBy: { name: 'asc' },
+  });
+
   const serverBrand = {
     id: brand.id,
     name: brand.name,
@@ -26,5 +32,11 @@ export default async function EditBrandPage({ params }: { params: Promise<{ id: 
     // coverPublicId: мы не знаем для существующих (если не храните), можно оставить null
   };
 
-  return <BrandForm serverBrand={serverBrand} products={brand.products} />;
+  return (
+    <BrandForm
+      serverBrand={serverBrand}
+      products={brand.products}
+      brandsForReassign={brandsForReassign}
+    />
+  );
 }

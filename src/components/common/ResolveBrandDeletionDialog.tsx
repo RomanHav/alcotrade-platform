@@ -59,14 +59,14 @@ export default function ResolveBrandDeletionDialog({
           <AlertDialogTitle>Бренд має прив’язані продукти</AlertDialogTitle>
           <AlertDialogDescription>
             Виберіть, що зробити з {total} продуктами:
-            <ul className="mt-2 list-inside list-disc text-sm">
-              {conflicts.map((c) => (
-                <li key={c.id}>
-                  {c.count} · бренд ID: <code>{c.id}</code>
-                </li>
-              ))}
-            </ul>
           </AlertDialogDescription>
+          <ul className="mt-2 list-inside list-disc text-sm">
+            {conflicts.map((c) => (
+              <li key={c.id}>
+                {c.count} · бренд ID: <code>{c.id}</code>
+              </li>
+            ))}
+          </ul>
         </AlertDialogHeader>
 
         <div className="mt-3 space-y-3">
