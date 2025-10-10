@@ -18,8 +18,8 @@ import {
   selectSearch,
   selectDeleting,
   selectSelectedIds,
-  selectEditingId, // ⬅️ для блокування кнопки
-  selectPartners, // ⬅️ для перевірки tmp_
+  selectEditingId,
+  selectPartners,
 } from '@/store/selectors/partnersSelector';
 import { bulkDeletePartners } from '@/store/operations/partnersOperation';
 
@@ -38,7 +38,6 @@ export default function PartnersMain({
   const deleting = useAppSelector(selectDeleting);
   const selectedIds = useAppSelector(selectSelectedIds);
 
-  // ⬇️ для блокування "Додати новий"
   const editingId = useAppSelector(selectEditingId);
   const items = useAppSelector(selectPartners);
   const hasTmp = React.useMemo(() => items.some((p) => p.id.startsWith('tmp_')), [items]);
@@ -81,8 +80,8 @@ export default function PartnersMain({
           />
           <Button
             className="cursor-pointer"
-            onClick={() => dispatch(triggerAddNew())} // ⬅️ без toast
-            disabled={addLocked} // ⬅️ просто неактивна
+            onClick={() => dispatch(triggerAddNew())}
+            disabled={addLocked}
             title={addLocked ? 'Спершу завершіть поточне редагування' : 'Додати нового партнера'}
           >
             Додати новий

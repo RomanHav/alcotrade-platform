@@ -10,7 +10,12 @@ import {
   type RowSelectionState,
 } from '@tanstack/react-table';
 import {
-  Table, TableHeader, TableBody, TableRow, TableCell, TableHead,
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableCell,
+  TableHead,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { makeColumns } from './makeColumns';
@@ -21,11 +26,13 @@ import {
   selectEditingId,
   selectDrafts,
   selectSearch,
-  selectRowSelection,         // ✅
+  selectRowSelection,
 } from '@/store/selectors/partnersSelector';
-import { setRowSelection as setRowSelectionAction } from '@/store/slices/partnersSlice'; // ✅
+import { setRowSelection as setRowSelectionAction } from '@/store/slices/partnersSlice';
 import { uploadPartnerLogo, savePartnerRow } from '@/store/operations/partnersOperation';
 import type { Partner } from '../core/types';
+
+import { toast } from 'sonner';
 
 export default function PartnersTable() {
   const dispatch = useAppDispatch();
@@ -33,17 +40,22 @@ export default function PartnersTable() {
   const editingId = useAppSelector(selectEditingId);
   const drafts = useAppSelector(selectDrafts);
   const search = useAppSelector(selectSearch);
-  const rowSelection = useAppSelector(selectRowSelection); // ✅ з Redux
+  const rowSelection = useAppSelector(selectRowSelection);
 
   const [sorting, setSorting] = React.useState<SortingState>([]);
 
   const cancelAndMaybeRemove = React.useCallback(
-    (id: string) => { dispatch(cancelEdit(id)); },
+    (id: string) => {
+      dispatch(cancelEdit(id));
+      toast('Зміни скасовано', { description: 'Локальні правки видалено.' });
+    },
     [dispatch],
   );
 
   const onStartEdit = React.useCallback(
-    (p: Partner) => { dispatch(startEdit(p)); },
+    (p: Partner) => {
+      dispatch(startEdit(p));
+    },
     [dispatch],
   );
 
@@ -55,7 +67,19 @@ export default function PartnersTable() {
   );
 
   const onSaveEdit = React.useCallback(
-    (id: string) => { void dispatch(savePartnerRow({ id })); },
+    async (id: string) => {
+      const isCreate = id.startsWith('tmp_');
+      try {
+        await dispatch(savePartnerRow({ id })).unwrap();
+        toast.success('Збережено', {
+          description: isCreate ? 'Партнера успішно додано.' : 'Партнера успішно оновлено.',
+        });
+      } catch (e: any) {
+        toast.error('Не вдалось зберегти', {
+          description: String(e?.message ?? 'Спробуйте ще раз.'),
+        });
+      }
+    },
     [dispatch],
   );
 
@@ -99,17 +123,25 @@ export default function PartnersTable() {
         onSaveEdit,
         onUploadImage,
       }),
-    [editingId, drafts, onDraftChange, onStartEdit, cancelAndMaybeRemove, onSaveEdit, onUploadImage],
+    [
+      editingId,
+      drafts,
+      onDraftChange,
+      onStartEdit,
+      cancelAndMaybeRemove,
+      onSaveEdit,
+      onUploadImage,
+    ],
   );
 
   const table = useReactTable({
     data: viewData,
     columns,
-    
+
     getRowId: (row: Partner) => row.id,
-    state: { sorting, rowSelection },                       
+    state: { sorting, rowSelection },
     onSortingChange: setSorting,
-    onRowSelectionChange: (updater) => {                
+    onRowSelectionChange: (updater) => {
       const next =
         typeof updater === 'function'
           ? (updater as (old: RowSelectionState) => RowSelectionState)(rowSelection)
@@ -121,10 +153,9 @@ export default function PartnersTable() {
     getSortedRowModel: getSortedRowModel(),
     initialState: { pagination: { pageSize: 10 } },
 
-     enableRowSelection: (row) => !String(row.original.id).startsWith('tmp_'),
-  enableMultiRowSelection: true
+    enableRowSelection: (row) => !String(row.original.id).startsWith('tmp_'),
+    enableMultiRowSelection: true,
   });
-
 
   return (
     <div className="w-full">
