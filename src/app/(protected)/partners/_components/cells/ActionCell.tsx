@@ -10,12 +10,14 @@ export function ActionCell({
   onStartEdit,
   onCancelEdit,
   onSaveEdit,
+  saveDisabled,
 }: {
   partner: Partner;
   editing: boolean;
   onStartEdit: (p: Partner) => void;
   onCancelEdit: (id: string) => void;
   onSaveEdit: (id: string) => void;
+  saveDisabled?: boolean;
 }) {
   if (editing) {
     return (
@@ -23,7 +25,8 @@ export function ActionCell({
         <Button
           size="sm"
           onClick={() => onSaveEdit(partner.id)}
-          className="h-8 px-2 cursor-pointer"
+          disabled={Boolean(saveDisabled)}
+          className="h-8 cursor-pointer px-2"
         >
           <Check className="h-4 w-4" />
           <span className="sr-only">Зберегти</span>
@@ -32,7 +35,7 @@ export function ActionCell({
           size="sm"
           variant="secondary"
           onClick={() => onCancelEdit(partner.id)}
-          className="h-8 px-2 cursor-pointer"
+          className="h-8 cursor-pointer px-2"
         >
           <X className="h-4 w-4" />
           <span className="sr-only">Скасувати</span>
@@ -45,7 +48,7 @@ export function ActionCell({
     <div className="flex items-center justify-start">
       <Button
         variant="ghost"
-        className="h-8 w-8 p-0 cursor-pointer"
+        className="h-8 w-8 cursor-pointer p-0"
         onClick={() => onStartEdit(partner)}
         aria-label="Редагувати партнера"
         title="Редагувати партнера"

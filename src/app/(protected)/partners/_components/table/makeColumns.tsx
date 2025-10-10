@@ -93,10 +93,9 @@ export function makeColumns(opts: EditOptions): ColumnDef<Partner>[] {
         );
       },
       sortingFn: (a, b, id) => {
-        // 🔒 Не чіпаємо порядок, якщо бере участь тимчасовий рядок (tmp_)
         const aTmp = String(a.original.id).startsWith('tmp_');
         const bTmp = String(b.original.id).startsWith('tmp_');
-        if (aTmp || bTmp) return 0; // зберігає початкову позицію tmp-рядка (перша)
+        if (aTmp || bTmp) return 0;
 
         const na = String(a.getValue(id) ?? '')
           .replace(/\./g, '')
@@ -154,6 +153,15 @@ export function makeColumns(opts: EditOptions): ColumnDef<Partner>[] {
       cell: ({ row }) => {
         const r = row.original;
         const isEditing = r.id === editingId;
+        const draft = drafts[r.id] ?? {};
+
+    
+        const nameVal = isEditing ? (draft.name ?? r.name) : r.name;
+        const imageVal = isEditing ? (draft.image ?? r.image) : r.image;
+
+        const nameOk = Boolean(String(nameVal ?? '').trim());
+        const imageOk = Boolean(String(imageVal ?? '').trim());
+        const saveDisabled = !(nameOk && imageOk);
         return (
           <div className="flex w-full justify-start">
             <ActionCell
@@ -162,6 +170,7 @@ export function makeColumns(opts: EditOptions): ColumnDef<Partner>[] {
               onStartEdit={onStartEdit}
               onCancelEdit={onCancelEdit}
               onSaveEdit={onSaveEdit}
+              saveDisabled={saveDisabled}
             />
           </div>
         );

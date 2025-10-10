@@ -24,9 +24,9 @@ import {
 import { bulkDeletePartners } from '@/store/operations/partnersOperation';
 
 import ConfigDialog from './common/ConfirmDialog';
-
 import { AnimatePresence, motion } from 'framer-motion';
 import { Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function PartnersMain({
   initialPartners = [] as Partner[],
@@ -51,14 +51,22 @@ export default function PartnersMain({
 
   const handleBulkDelete = React.useCallback(async () => {
     if (!selectedIds.length) return;
+    const count = selectedIds.length;
+    const noun = count === 1 ? 'партнера' : 'партнерів';
+
     try {
       dispatch(setDeleting(true));
 
       dispatch(removeRowsByIds(selectedIds));
 
       await dispatch(bulkDeletePartners({ ids: selectedIds })).unwrap();
+
       dispatch(clearSelection());
-    } catch (e) {
+      toast.success('Видалено', { description: `Успішно видалено ${count} ${noun}.` });
+    } catch (e: any) {
+      toast.error('Не вдалось видалити', {
+        description: String(e?.message ?? 'Спробуйте ще раз.'),
+      });
       console.error('Delete error:', e);
     } finally {
       dispatch(setDeleting(false));
@@ -68,7 +76,7 @@ export default function PartnersMain({
 
   return (
     <div className="px-8 pt-16">
-      <h1 className="mb-9 text-4xl">Партнери</h1>
+      <h1 className="mb-9 text-4xl font-semibold">Партнери</h1>
       <div className="flex flex-col gap-5 rounded-2xl border border-neutral-200 bg-neutral-50 p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
         <div className="flex items-center justify-between">
           <Input
@@ -103,7 +111,9 @@ export default function PartnersMain({
                   Обрано: <b>{selectedIds.length}</b>{' '}
                   <button
                     className="underline opacity-70 transition-opacity hover:opacity-100"
-                    onClick={() => dispatch(clearSelection())}
+                    onClick={() => {
+                      dispatch(clearSelection());
+                    }}
                   >
                     Очистити
                   </button>
