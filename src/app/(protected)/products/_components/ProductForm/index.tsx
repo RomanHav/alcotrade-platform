@@ -62,7 +62,6 @@ export default function ProductForm({
 
   const { isDirty, initialRef, comparable } = useDirtySnapshot(serverProduct, data, slug);
 
-  // предупреждение при закрытии, если есть изменения
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       if (!isDirty) return;
@@ -73,7 +72,6 @@ export default function ProductForm({
     return () => window.removeEventListener('beforeunload', handler);
   }, [isDirty]);
 
-  // валидация
   const [errors, setErrors] = useState<{
     name?: string;
     description?: string;
@@ -97,7 +95,6 @@ export default function ProductForm({
     return Object.keys(next).length === 0;
   }
 
-  // сохранить (thunk)
   const onSave = async () => {
     if (saving || !isDirty) return;
     if (!validate()) return;

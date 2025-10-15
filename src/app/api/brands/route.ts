@@ -1,6 +1,53 @@
 // src/app/api/brands/route.ts
+import { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireReadToken } from '@/lib/requireReadToken';
+
+export async function GET(req: Request) {
+  const guard = requireReadToken(req);
+  if (guard) return guard;
+  const { searchParams } = new URL(req.url);
+  const q = searchParams.get('q')?.trim() || '';
+  const page = Math.max(1, Number(searchParams.get('page') || 1));
+  const limit = Math.min(50, Math.max(1, Number(searchParams.get('limit') || 20)));
+  const status = (searchParams.get('status') as 'ACTIVE' | 'DRAFT' | 'ARCHIVE' | null) || 'ACTIVE';
+
+  const where: Prisma.BrandWhereInput = {
+    status,
+    ...(q
+      ? {
+          OR: [
+            { name: { contains: q, mode: 'insensitive' } },
+            { description: { contains: q, mode: 'insensitive' } },
+            { slug: { contains: q, mode: 'insensitive' } },
+          ],
+        }
+      : {}),
+  };
+
+  const [total, items] = await Promise.all([
+    prisma.brand.count({ where }),
+    prisma.brand.findMany({
+      where,
+      orderBy: { name: 'asc' },
+      skip: (page - 1) * limit,
+      take: limit,
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        description: true,
+        seoTitle: true,
+        seoDescription: true,
+        cover: { select: { url: true, width: true, height: true, alt: true } },
+        _count: { select: { products: true } },
+      },
+    }),
+  ]);
+
+  return NextResponse.json({ items, page, limit, total });
+}
 
 export async function DELETE(req: Request) {
   const body = await req.json().catch(() => ({}));
@@ -71,7 +118,7 @@ export async function DELETE(req: Request) {
     }
 
     return NextResponse.json({ ok: true });
-  } catch (e) {
+  } catch (_e) {
     return NextResponse.json({ message: 'Delete failed' }, { status: 500 });
   }
 }
