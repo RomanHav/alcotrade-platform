@@ -57,7 +57,9 @@ export async function GET(req: Request) {
     const page = parseIntSafe(searchParams.get('page'), 1);
     const pageSize = Math.min(100, parseIntSafe(searchParams.get('pageSize'), 10));
     const query = searchParams.get('query')?.trim() || '';
-    const status = searchParams.get('status') as Prisma.NewsStatus | null;
+
+    const status = searchParams.get('status') as 'DRAFT' | 'ACTIVE' | 'ARCHIVE' | null;
+
     const dateParam = searchParams.get('date')?.trim() || '';
     const sort = searchParams.get('sort') || 'name_asc';
 
