@@ -9,7 +9,7 @@ export async function GET(_req: Request, context: any) {
   const guard = requireReadToken(_req);
   if (guard) return guard;
   const product = await prisma.product.findUnique({
-    where: { slug: params.slug },
+    where: { slug: params.slug, status: 'ACTIVE' },
     select: {
       id: true,
       name: true,
