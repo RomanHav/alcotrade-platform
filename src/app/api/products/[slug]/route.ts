@@ -4,7 +4,8 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireReadToken } from '@/lib/requireReadToken';
 
-export async function GET(_req: Request, { params }: { params: { slug: string } }) {
+export async function GET(_req: Request, context: any) {
+  const { params } = context as { params: { slug: string } };
   const guard = requireReadToken(_req);
   if (guard) return guard;
   const product = await prisma.product.findUnique({
