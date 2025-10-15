@@ -5,11 +5,14 @@ import partnersReducer from './slices/partnersSlice';
 import productsUi from './slices/productsUiSlice';
 import themeReducer from './slices/themeSlice';
 import seoReducer from './slices/defaultSeoSlice';
+import articleReducer from './slices/articles';
 
 export const store = configureStore({
   reducer: {
     productForm: productFormReducer,
     brandForm: brandFormReducer,
+    articles: articleReducer,
+
     partners: partnersReducer,
     productsUi,
     theme: themeReducer,
