@@ -62,7 +62,7 @@ export const saveArticle = createAsyncThunk<{ id: string }, SaveArticleDto, { st
       try {
         const qs = new URLSearchParams();
         qs.set('mediaId', form.coverId);
-        await fetch(`/api/articles/upload?${qs.toString()}`, { method: 'DELETE' });
+        await fetch(`/api/upload?${qs.toString()}`, { method: 'DELETE' });
       } catch {}
     }
 
@@ -71,8 +71,15 @@ export const saveArticle = createAsyncThunk<{ id: string }, SaveArticleDto, { st
     if (form.pendingCoverFile) {
       const fd = new FormData();
       fd.append('file', form.pendingCoverFile as unknown as Blob);
+      fd.append('entity', 'news');
+      if (form.id) {
+        fd.append('attach', 'cover');
+        fd.append('articleId', form.id);
+      } else {
+        fd.append('attach', 'cover');
+      }
 
-      const upRes = await fetch('/api/articles/upload', { method: 'POST', body: fd });
+      const upRes = await fetch('/api/upload', { method: 'POST', body: fd });
       if (!upRes.ok) {
         const t = await upRes.text();
         return rejectWithValue(t || 'Upload failed');
@@ -85,6 +92,15 @@ export const saveArticle = createAsyncThunk<{ id: string }, SaveArticleDto, { st
       ...payload,
       date: normalizeDate(payload.date ?? form.date ?? null),
       coverId: coverIdToUse ?? null,
+      seoTitle:
+        (payload.seoTitle ?? form.seoTitle ?? null) && String(payload.seoTitle ?? form.seoTitle ?? '').trim()
+          ? String(payload.seoTitle ?? form.seoTitle).trim()
+          : null,
+      seoDescription:
+        (payload.seoDescription ?? form.seoDescription ?? null) &&
+        String(payload.seoDescription ?? form.seoDescription ?? '').trim()
+          ? String(payload.seoDescription ?? form.seoDescription).trim()
+          : null,
     };
 
     const res = await fetch('/api/articles/save', {
