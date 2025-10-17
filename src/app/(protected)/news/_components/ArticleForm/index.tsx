@@ -78,22 +78,24 @@ export default function ArticleForm({
     setSlug(serverArticle?.slug ?? '');
   }, [dispatch, serverArticle]);
 
-  // dirty snapshot (простий детектор змін)
   const isDirty = React.useMemo(() => {
-    const pick = (v: any) =>
-      JSON.stringify({
-        id: v.id ?? null,
-        status: v.status ?? 'DRAFT',
-        title: v.title ?? '',
-        excerpt: v.excerpt ?? '',
-        content: v.content ?? '',
-        seoTitle: v.seoTitle ?? null,
-        seoDescription: v.seoDescription ?? null,
-        coverId: v.coverId ?? null,
-        date: v.date ?? null,
-      });
-    return pick(serverArticle ?? {}) !== pick({ ...data });
-  }, [serverArticle, data]);
+  const pick = (v: any) =>
+    JSON.stringify({
+      id: v.id ?? null,
+      status: v.status ?? 'DRAFT',
+      title: v.title ?? '',
+      excerpt: v.excerpt ?? '',
+      content: v.content ?? '',
+      seoTitle: v.seoTitle ?? null,
+      seoDescription: v.seoDescription ?? null,
+      coverId: v.coverId ?? null,
+      date: v.date ?? null,
+      _pendingCover: !!v.pendingCoverFile,
+      _pendingDelete: !!v.pendingCoverDelete,
+    });
+
+  return pick(serverArticle ?? {}) !== pick({ ...data });
+}, [serverArticle, data]);
 
   // warn on unload
   useEffect(() => {
@@ -151,7 +153,6 @@ export default function ArticleForm({
       await dispatch(saveArticle(parsed)).unwrap();
 
       toast.success('Збережено', { description: 'Статтю успішно збережено.' });
-      console.log(parsed)
       router.push('/news');
     } catch (err: any) {
       const code = typeof err === 'string' ? err : err?.message;

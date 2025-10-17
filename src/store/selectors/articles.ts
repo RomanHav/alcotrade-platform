@@ -4,7 +4,6 @@ import { createSelector } from '@reduxjs/toolkit';
 
 export const selectArticlesState = (s: RootState) => s.articles;
 
-// список
 export const selectItems = (s: RootState) => s.articles.items;
 export const selectTotal = (s: RootState) => s.articles.total;
 export const selectLoading = (s: RootState) => s.articles.loading;
@@ -29,7 +28,6 @@ export const selectSelectedIds = createSelector(selectItems, selectRowSelection,
     .filter(Boolean),
 );
 
-// форма
 export const selectArticleForm = (s: RootState) => s.articles.form;
 export const selectFormField = <K extends keyof ReturnType<typeof selectArticleForm>>(key: K) =>
   createSelector(selectArticleForm, (f) => f[key]);

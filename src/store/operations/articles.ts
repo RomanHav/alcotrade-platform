@@ -21,18 +21,18 @@ export type SaveArticleDto = {
   status: NewsStatus;
   excerpt?: string;
   content?: string;
-  date?: string | null; // ISO або null
+  date?: string | null;
   seoTitle?: string | null;
   seoDescription?: string | null;
   coverId?: string | null;
   slug: string;
-  locale?: string; // опц., дефолт 'uk'
+  locale?: string;
 };
 
 export const fetchArticles = createAsyncThunk<
   { items: ArticleListItem[]; total: number },
   void,
-  { state: RootState }
+  { state: RootState; rejectValue: string }
 >('articles/fetchArticles', async (_, { getState, rejectWithValue }) => {
   const s = getState().articles;
   const usp = new URLSearchParams();
@@ -40,7 +40,7 @@ export const fetchArticles = createAsyncThunk<
   usp.set('pageSize', String(s.pageSize));
   if (s.query) usp.set('query', s.query);
   if (s.status) usp.set('status', s.status);
-  if (s.date) usp.set('date', s.date); // YYYY-MM-DD або ISO
+  if (s.date) usp.set('date', s.date);
   if (s.sort) usp.set('sort', s.sort);
 
   const res = await fetch(`/api/articles?${usp.toString()}`, { cache: 'no-store' });
@@ -48,45 +48,31 @@ export const fetchArticles = createAsyncThunk<
   return (await res.json()) as { items: ArticleListItem[]; total: number };
 });
 
-// Нормалізуємо дату: YYYY-MM-DD -> ISO початку дня; інакше повертаємо як є
 const normalizeDate = (d?: string | null) => {
   if (!d) return null;
   return /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(`${d}T00:00:00`).toISOString() : d;
 };
 
-// ⬇️ ОНОВЛЕНО: відкладений аплоад/видалення обкладинки
-export const saveArticle = createAsyncThunk<{ id: string }, SaveArticleDto, { state: RootState }>(
+export const saveArticle = createAsyncThunk<{ id: string }, SaveArticleDto, { state: RootState; rejectValue: string }>(
   'articles/saveArticle',
   async (payload, { getState, rejectWithValue }) => {
     const form = getState().articles.form;
 
-    // 1) Якщо позначено видалення чинної обкладинки — скасовуємо зв’язок/видаляємо asset (опц.)
-    // Якщо coverId вже очищено у формі — бек, який прийме coverId:null, теж відв’яже.
     if (form.pendingCoverDelete && form.coverId) {
       try {
         const qs = new URLSearchParams();
         qs.set('mediaId', form.coverId);
-        await fetch(`/api/uploads?${qs.toString()}`, { method: 'DELETE' });
-      } catch {
-        /* no-op */
-      }
+        await fetch(`/api/articles/upload?${qs.toString()}`, { method: 'DELETE' });
+      } catch {}
     }
 
-    // 2) Якщо вибрано новий файл — вантажимо його зараз у Cloudinary
     let coverIdToUse: string | null = (payload.coverId ?? form.coverId ?? null) as string | null;
 
     if (form.pendingCoverFile) {
       const fd = new FormData();
       fd.append('file', form.pendingCoverFile as unknown as Blob);
-      fd.append('entity', 'news'); // папка для новин вибереться на бекенді
 
-      // Якщо це редагування існуючої статті — одразу прив’язати як cover
-      if (form.id) {
-        fd.append('attach', 'cover');
-        fd.append('articleId', form.id);
-      }
-
-      const upRes = await fetch('/api/uploads', { method: 'POST', body: fd });
+      const upRes = await fetch('/api/articles/upload', { method: 'POST', body: fd });
       if (!upRes.ok) {
         const t = await upRes.text();
         return rejectWithValue(t || 'Upload failed');
@@ -95,7 +81,6 @@ export const saveArticle = createAsyncThunk<{ id: string }, SaveArticleDto, { st
       coverIdToUse = up?.media?.id ?? null;
     }
 
-    // 3) Готуємо payload для збереження
     const body: SaveArticleDto = {
       ...payload,
       date: normalizeDate(payload.date ?? form.date ?? null),
@@ -125,7 +110,8 @@ export const saveArticle = createAsyncThunk<{ id: string }, SaveArticleDto, { st
 
 export const deleteArticle = createAsyncThunk<
   { deleted: number; ids: string[] },
-  { ids: string[] }
+  { ids: string[] },
+  { state: RootState; rejectValue: string }
 >('articles/deleteArticle', async ({ ids }, { rejectWithValue }) => {
   const res = await fetch('/api/articles', {
     method: 'DELETE',

@@ -22,8 +22,8 @@ export type ArticleForm = {
   date?: string | null;
   slug?: string | null;
 
-  pendingCoverFile?: File | null; // зберігаємо File до моменту "Зберегти"
-  pendingCoverDelete?: boolean; // позначка, що треба видалити чинну обкладинку при "Зберегти"
+  pendingCoverFile?: File | null; 
+  pendingCoverDelete?: boolean;
 };
 
 export type ArticlesState = {
