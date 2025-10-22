@@ -43,14 +43,13 @@ const schema = z.object({
   status: z.enum(['ACTIVE', 'DRAFT', 'ARCHIVE']),
   excerpt: z.string().max(300).optional(),
   content: z.string().optional(),
-  date: z.string().nullable().optional(), // YYYY-MM-DD або ISO, конвертнемо нижче
+  date: z.string().nullable().optional(),
   seoTitle: z.string().max(60).nullable().optional(),
   seoDescription: z.string().max(160).nullable().optional(),
   coverId: z.string().nullable().optional(),
   slug: z.string().min(1, 'Вкажіть або згенеруйте посилання (slug)'),
 });
 
-// привід будь-якого формату дати до YYYY-MM-DD для NewsDatePicker
 const toYMDfromAny = (v?: string | null) =>
   v ? (/^\d{4}-\d{2}-\d{2}$/.test(v) ? v : new Date(v).toISOString().slice(0, 10)) : undefined;
 
@@ -78,22 +77,24 @@ export default function ArticleForm({
     setSlug(serverArticle?.slug ?? '');
   }, [dispatch, serverArticle]);
 
-  // dirty snapshot (простий детектор змін)
   const isDirty = React.useMemo(() => {
-    const pick = (v: any) =>
-      JSON.stringify({
-        id: v.id ?? null,
-        status: v.status ?? 'DRAFT',
-        title: v.title ?? '',
-        excerpt: v.excerpt ?? '',
-        content: v.content ?? '',
-        seoTitle: v.seoTitle ?? null,
-        seoDescription: v.seoDescription ?? null,
-        coverId: v.coverId ?? null,
-        date: v.date ?? null,
-      });
-    return pick(serverArticle ?? {}) !== pick({ ...data });
-  }, [serverArticle, data]);
+  const pick = (v: any) =>
+    JSON.stringify({
+      id: v.id ?? null,
+      status: v.status ?? 'DRAFT',
+      title: v.title ?? '',
+      excerpt: v.excerpt ?? '',
+      content: v.content ?? '',
+      seoTitle: v.seoTitle ?? null,
+      seoDescription: v.seoDescription ?? null,
+      coverId: v.coverId ?? null,
+      date: v.date ?? null,
+      _pendingCover: !!v.pendingCoverFile,
+      _pendingDelete: !!v.pendingCoverDelete,
+    });
+
+  return pick(serverArticle ?? {}) !== pick({ ...data });
+}, [serverArticle, data]);
 
   // warn on unload
   useEffect(() => {
@@ -141,17 +142,20 @@ export default function ArticleForm({
         excerpt: data.excerpt ?? '',
         content: data.content ?? '',
         date: dateISO,
-        seoTitle: data.seoTitle ?? null,
-        seoDescription: data.seoDescription ?? null,
+        seoTitle: (data.seoTitle && data.seoTitle.trim()) || (data.title ?? null),
+        seoDescription:
+        (data.seoDescription && data.seoDescription.trim()) ||
+        (data.content ?? '').slice(0, 160) ||
+        null,
         coverId: data.coverId ?? null,
         slug: makeSlug(slug || data.title || ''),
       });
 
       setSaving(true);
       await dispatch(saveArticle(parsed)).unwrap();
+      console.log('Article saved successfully:', parsed);
 
       toast.success('Збережено', { description: 'Статтю успішно збережено.' });
-      console.log(parsed)
       router.push('/news');
     } catch (err: any) {
       const code = typeof err === 'string' ? err : err?.message;

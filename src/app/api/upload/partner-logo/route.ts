@@ -6,7 +6,7 @@ export const runtime = 'nodejs';
 cloudinary.config({ secure: true });
 
 function splitPublicId(input: string | null): { folder: string; name: string } {
-  const DEFAULT_FOLDER = 'Alcotrade/partners';
+  const DEFAULT_FOLDER = process.env.CLOUDINARY_UPLOAD_PARTNER_FOLDER as string;
   if (!input) return { folder: DEFAULT_FOLDER, name: `unnamed_${Date.now()}` };
 
   const cleaned = input.replace(/^\/+|\/+$/g, '').trim();

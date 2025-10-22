@@ -28,7 +28,6 @@ export async function POST(req: Request) {
     const raw = await req.json();
     const data = bodySchema.parse(raw);
 
-    // унікальність slug+locale (окрім поточного id у режимі update)
     const conflict = await prisma.article.findFirst({
       where: {
         slug: data.slug,
@@ -53,7 +52,7 @@ export async function POST(req: Request) {
       slug: data.slug,
       locale: data.locale,
     };
-
+    console.log(common);
     if (data.id) {
       const updated = await prisma.article.update({
         where: { id: data.id },

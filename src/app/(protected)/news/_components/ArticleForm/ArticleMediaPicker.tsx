@@ -40,8 +40,6 @@ export default function ArticleMediaPicker() {
     // якщо раніше натискали "Видалити" — скасовуємо відкладене видалення
     dispatch(setField({ key: 'pendingCoverDelete', value: false }));
 
-    toast('Файл вибрано. Завантаження буде при збереженні.');
-    // очистити input для повторного вибору того ж файлу
     if (inputRef.current) inputRef.current.value = '';
   };
 

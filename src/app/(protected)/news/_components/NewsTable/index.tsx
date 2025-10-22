@@ -86,33 +86,29 @@ export default function NewsTable() {
   const pathname = usePathname();
   const sp = useSearchParams();
 
-  // URL-параметри
+
   const page = Math.max(1, Number(sp.get('page') ?? 1));
   const query = sp.get('query') ?? '';
   const status = (sp.get('status') as NewsStatus | null) ?? undefined;
-  const dateFrom = sp.get('dateFrom') ?? undefined; // YYYY-MM-DD
-  const dateTo = sp.get('dateTo') ?? undefined; // YYYY-MM-DD
-  const sort = sp.get('sort') ?? 'name_asc'; // ⬅️ нове: читаємо сортування
+  const dateFrom = sp.get('dateFrom') ?? undefined;
+  const dateTo = sp.get('dateTo') ?? undefined;
+  const sort = sp.get('sort') ?? 'name_asc';
 
-  // UI-стани шитів
+
   const [sortOpen, setSortOpen] = useState(false);
-  const [sortDraft, setSortDraft] = useState<string>(sort); // ⬅️ ініціал з URL
+  const [sortDraft, setSortDraft] = useState<string>(sort);
 
-  // Синхронізація draft сорту з URL, якщо юзер змінив параметри поза шитом
   useEffect(() => {
     setSortDraft(sort);
   }, [sort]);
 
-  // Стан таблиці/даних
   const [items, setItems] = useState<NewsItem[]>([]);
   const [total, setTotal] = useState(0);
 
-  // Вибір рядків
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [showDelete, setShowDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // Фільтр-стік
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterDraft, setFilterDraft] = useState<FilterDraft>({
     query,
@@ -121,7 +117,6 @@ export default function NewsTable() {
     dateTo,
   });
 
-  // ⬅️ тримаємо draft фільтра синхронним з URL (щоб у шиті були актуальні значення)
   useEffect(() => {
     setFilterDraft((d) => ({
       ...d,
@@ -132,7 +127,6 @@ export default function NewsTable() {
     }));
   }, [query, status, dateFrom, dateTo]);
 
-  // Завантаження списку (враховуючи page + фільтри + СОРТ)
   useEffect(() => {
     let abort = false;
 
@@ -145,7 +139,7 @@ export default function NewsTable() {
       if (status) params.set('status', status);
       if (dateFrom) params.set('dateFrom', dateFrom);
       if (dateTo) params.set('dateTo', dateTo);
-      if (sort) params.set('sort', sort); // ⬅️ нове: передаємо сортування на бек
+      if (sort) params.set('sort', sort);
 
       const res = await fetch(`/api/articles?${params.toString()}`, { cache: 'no-store' });
       if (!res.ok) return;
@@ -161,9 +155,8 @@ export default function NewsTable() {
     return () => {
       abort = true;
     };
-  }, [page, query, status, dateFrom, dateTo, sort]); // ⬅️ sort у залежностях
+  }, [page, query, status, dateFrom, dateTo, sort]);
 
-  // Колонки таблиці
   const columns = useMemo<ColumnDef<NewsItem>[]>(
     () => [
       {
@@ -272,7 +265,7 @@ export default function NewsTable() {
     if (selectedIds.length === 0) return;
     setDeleting(true);
     try {
-      const res = await fetch('/api/articles/bulk', {
+      const res = await fetch('/api/articles', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ids: selectedIds }),
@@ -290,7 +283,6 @@ export default function NewsTable() {
     }
   };
 
-  // Дії фільтра
   const applyFilter = () => {
     applyParams({
       query: filterDraft.query || undefined,
@@ -327,7 +319,6 @@ export default function NewsTable() {
     activeFilters.push({ key: 'date', label: `Дата: ${label}` });
   }
 
-  // Дії сорту
   const applySort = () => {
     applyParams({ sort: sortDraft || 'name_asc' });
     setSortOpen(false);
@@ -339,7 +330,6 @@ export default function NewsTable() {
       className="bg-card rounded-2xl border p-5 shadow-sm"
       transition={{ duration: 0.2 }}
     >
-      {/* top bar */}
       <motion.div layout className="mb-3 flex items-center gap-2">
         <Input
           placeholder="Пошук"
@@ -376,7 +366,6 @@ export default function NewsTable() {
         </div>
       </motion.div>
 
-      {/* active chips */}
       <motion.div layout className="mb-2 flex flex-wrap items-center gap-3">
         <AnimatePresence initial={false}>
           {activeFilters.length > 0 && (
