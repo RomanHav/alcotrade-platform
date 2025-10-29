@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
-import { ProductStatus, Prisma } from '@prisma/client'; // 👈 добавили Prisma
+import { ProductStatus, Prisma } from '@prisma/client';
 import { slug as makeSlug } from '@/lib/slug';
 
 type VariantInput = {
@@ -8,7 +8,7 @@ type VariantInput = {
   label?: string | null;
   volumeMl?: number | null;
   position: number;
-  imageId?: string | null; // делаем optional, удобнее при парсинге
+  imageId?: string | null;
 };
 
 type SaveInput = {
@@ -25,7 +25,6 @@ type SaveInput = {
   slug?: string | null;
 };
 
-// Генерация уникального slug (для случаев, когда slug не задан явно)
 async function ensureUniqueSlug(
   tx: Prisma.TransactionClient,
   base: string,
@@ -54,20 +53,15 @@ export async function POST(req: Request) {
       const { id, variants = [], imageIds = [], slug, ...rest } = data;
 
       await prisma.$transaction(async (tx) => {
-        // валидные media
         const existing = await tx.mediaAsset.findMany({
           where: { id: { in: imageIds } },
           select: { id: true },
         });
         const valid = existing.map((m) => m.id);
 
-        // coverId
         let safeCoverId: string | null = rest.coverId ?? null;
         if (!safeCoverId || !valid.includes(safeCoverId)) safeCoverId = valid[0] ?? null;
 
-        // slug:
-        // - если в запросе пришёл непустой slug -> проверяем конфликт, при конфликте кидаем SLUG_TAKEN
-        // - если пустой -> генерим уникальный из name
         const raw = (slug ?? '').trim();
         let nextSlug: string;
         if (raw) {
@@ -87,7 +81,6 @@ export async function POST(req: Request) {
           data: { ...rest, coverId: safeCoverId, slug: nextSlug },
         });
 
-        // варианты — пересобираем
         await tx.productVariant.deleteMany({ where: { productId: id } });
         if (variants.length) {
           await tx.productVariant.createMany({
@@ -101,7 +94,6 @@ export async function POST(req: Request) {
           });
         }
 
-        // галерея — пересобираем
         await tx.productImage.deleteMany({ where: { productId: id } });
         if (valid.length) {
           await tx.productImage.createMany({

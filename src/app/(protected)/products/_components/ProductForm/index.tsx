@@ -100,12 +100,15 @@ export default function ProductForm({
     if (!validate()) return;
 
     setSaving(true);
+
+    const normalizeNewlines = (s?: string | null) => s?.replace(/\r\n/g, '\n') ?? null;
+
     const payload = {
       id: data.id,
       name: data.name!,
       status: data.status as ProductStatus,
       brandId: data.brandId!,
-      description: data.description ?? null,
+      description: normalizeNewlines(data.description),
       seoTitle: (data.seoTitle && data.seoTitle.trim()) || (data.name ?? null),
       seoDescription:
         (data.seoDescription && data.seoDescription.trim()) ||
