@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import RichTextarea from '@/components/ui/rich-textarea';
 import {
   Select,
   SelectContent,
@@ -270,10 +271,10 @@ export default function BrandForm({
 
           <div>
             <label className="mb-1 block text-sm">Опис бренду</label>
-            <Textarea
+            <RichTextarea
               rows={6}
               value={data.description ?? ''}
-              onChange={(e) => dispatch(setField({ key: 'description', value: e.target.value }))}
+              onChange={(v) => dispatch(setField({ key: 'description', value: v }))}
             />
           </div>
 
@@ -310,7 +311,7 @@ export default function BrandForm({
           <div className="space-y-3">
             <div className="text-sm font-medium">Налаштування в пошукових системах</div>
 
-            <div className="bg-muted/30 rounded-lg border p-3">
+            <div className="bg-muted/30 rounded-lg border p-3 w-full max-w-[720px] break-words">
               <a
                 href={`${SITE}/uk/brands/${previewSlug}`}
                 className="text-primary block text-lg underline-offset-4 hover:underline"
@@ -330,6 +331,11 @@ export default function BrandForm({
                 value={data.seoTitle ?? ''}
                 onChange={(e) => dispatch(setField({ key: 'seoTitle', value: e.target.value }))}
               />
+              <div
+                className={`mt-1 text-right text-xs ${((data.seoTitle ?? '').trim().length > 60) ? 'text-amber-600' : 'text-muted-foreground'}`}
+              >
+                {((data.seoTitle ?? '').trim().length)} / 60
+              </div>
             </div>
 
             <div>
@@ -341,7 +347,13 @@ export default function BrandForm({
                 onChange={(e) =>
                   dispatch(setField({ key: 'seoDescription', value: e.target.value }))
                 }
+                className="max-w-[720px] resize-y"
               />
+              <div
+                className={`mt-1 text-right text-xs ${((data.seoDescription ?? '').trim().length > 160) ? 'text-amber-600' : 'text-muted-foreground'}`}
+              >
+                {((data.seoDescription ?? '').trim().length)} / 160
+              </div>
             </div>
 
             <div>

@@ -33,7 +33,7 @@ export default function VariantCard({
             title="додати"
           >
             {imageUrl ? (
-              <Image src={imageUrl} alt="" fill className="h-full w-full object-cover" />
+              <Image src={imageUrl} alt="" height={250} width={250} className="h-full w-full object-cover" />
             ) : (
               <span className="text-2xl">＋</span>
             )}
