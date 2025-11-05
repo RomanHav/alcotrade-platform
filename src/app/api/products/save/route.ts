@@ -26,7 +26,7 @@ type SaveInput = {
 };
 
 async function ensureUniqueSlug(
-  tx: Prisma.TransactionClient,
+  client: { product: Prisma.ProductDelegate },
   base: string,
   excludeId?: string,
 ): Promise<string> {
@@ -35,7 +35,7 @@ async function ensureUniqueSlug(
   let i = 2;
 
   while (
-    await tx.product.findFirst({
+    await client.product.findFirst({
       where: { slug: candidate, ...(excludeId ? { id: { not: excludeId } } : {}) },
       select: { id: true },
     })
@@ -49,41 +49,45 @@ export async function POST(req: Request) {
   const data: SaveInput = await req.json();
 
   try {
+    const normalizeNewlines = (s?: string | null) => (s == null ? s ?? null : s.replace(/\r\n/g, '\n').replace(/\r/g, '\n'));
+
     if (data.id) {
       const { id, variants = [], imageIds = [], slug, ...rest } = data;
 
-      await prisma.$transaction(async (tx) => {
-        const existing = await tx.mediaAsset.findMany({
-          where: { id: { in: imageIds } },
+      const existing = await prisma.mediaAsset.findMany({
+        where: { id: { in: imageIds } },
+        select: { id: true },
+      });
+      const valid = existing.map((m) => m.id);
+
+      let safeCoverId: string | null = rest.coverId ?? null;
+      if (!safeCoverId || !valid.includes(safeCoverId)) safeCoverId = valid[0] ?? null;
+
+      const raw = (slug ?? '').trim();
+      let nextSlug: string;
+      if (raw) {
+        const cleaned = makeSlug(raw);
+        const taken = await prisma.product.findFirst({
+          where: { slug: cleaned, id: { not: id } },
           select: { id: true },
         });
-        const valid = existing.map((m) => m.id);
+        if (taken) throw new Error('SLUG_TAKEN');
+        nextSlug = cleaned;
+      } else {
+        nextSlug = await ensureUniqueSlug(prisma as any, rest.name, id);
+      }
 
-        let safeCoverId: string | null = rest.coverId ?? null;
-        if (!safeCoverId || !valid.includes(safeCoverId)) safeCoverId = valid[0] ?? null;
-
-        const raw = (slug ?? '').trim();
-        let nextSlug: string;
-        if (raw) {
-          const cleaned = makeSlug(raw);
-          const taken = await tx.product.findFirst({
-            where: { slug: cleaned, id: { not: id } },
-            select: { id: true },
-          });
-          if (taken) throw new Error('SLUG_TAKEN');
-          nextSlug = cleaned;
-        } else {
-          nextSlug = await ensureUniqueSlug(tx, rest.name, id);
-        }
-
-        await tx.product.update({
+      const writes: Prisma.PrismaPromise<any>[] = [];
+      writes.push(
+        prisma.product.update({
           where: { id },
-          data: { ...rest, coverId: safeCoverId, slug: nextSlug },
-        });
-
-        await tx.productVariant.deleteMany({ where: { productId: id } });
-        if (variants.length) {
-          await tx.productVariant.createMany({
+          data: { ...rest, description: normalizeNewlines(rest.description), coverId: safeCoverId, slug: nextSlug },
+        }),
+      );
+      writes.push(prisma.productVariant.deleteMany({ where: { productId: id } }));
+      if (variants.length) {
+        writes.push(
+          prisma.productVariant.createMany({
             data: variants.map((v, i) => ({
               productId: id,
               label: v.label ?? null,
@@ -91,49 +95,52 @@ export async function POST(req: Request) {
               position: v.position ?? i,
               imageId: v.imageId ?? null,
             })),
-          });
-        }
-
-        await tx.productImage.deleteMany({ where: { productId: id } });
-        if (valid.length) {
-          await tx.productImage.createMany({
+          }),
+        );
+      }
+      writes.push(prisma.productImage.deleteMany({ where: { productId: id } }));
+      if (valid.length) {
+        writes.push(
+          prisma.productImage.createMany({
             data: valid.map((mediaId, i) => ({ productId: id, mediaId, position: i })),
-          });
-        }
-      });
+          }),
+        );
+      }
+      await prisma.$transaction(writes);
     } else {
       const { variants = [], imageIds = [], slug, ...rest } = data;
 
-      await prisma.$transaction(async (tx) => {
-        const existing = await tx.mediaAsset.findMany({
-          where: { id: { in: imageIds } },
+      const existing = await prisma.mediaAsset.findMany({
+        where: { id: { in: imageIds } },
+        select: { id: true },
+      });
+      const valid = existing.map((m) => m.id);
+
+      let safeCoverId: string | null = rest.coverId ?? null;
+      if (!safeCoverId || !valid.includes(safeCoverId)) safeCoverId = valid[0] ?? null;
+
+      const raw = (slug ?? '').trim();
+      let nextSlug: string;
+      if (raw) {
+        const cleaned = makeSlug(raw);
+        const taken = await prisma.product.findFirst({
+          where: { slug: cleaned },
           select: { id: true },
         });
-        const valid = existing.map((m) => m.id);
+        if (taken) throw new Error('SLUG_TAKEN');
+        nextSlug = cleaned;
+      } else {
+        nextSlug = await ensureUniqueSlug(prisma as any, rest.name);
+      }
 
-        let safeCoverId: string | null = rest.coverId ?? null;
-        if (!safeCoverId || !valid.includes(safeCoverId)) safeCoverId = valid[0] ?? null;
+      const created = await prisma.product.create({
+        data: { ...rest, description: normalizeNewlines(rest.description), slug: nextSlug, coverId: safeCoverId },
+      });
 
-        const raw = (slug ?? '').trim();
-        let nextSlug: string;
-        if (raw) {
-          const cleaned = makeSlug(raw);
-          const taken = await tx.product.findFirst({
-            where: { slug: cleaned },
-            select: { id: true },
-          });
-          if (taken) throw new Error('SLUG_TAKEN');
-          nextSlug = cleaned;
-        } else {
-          nextSlug = await ensureUniqueSlug(tx, rest.name);
-        }
-
-        const created = await tx.product.create({
-          data: { ...rest, slug: nextSlug, coverId: safeCoverId },
-        });
-
-        if (variants.length) {
-          await tx.productVariant.createMany({
+      const writes: Prisma.PrismaPromise<any>[] = [];
+      if (variants.length) {
+        writes.push(
+          prisma.productVariant.createMany({
             data: variants.map((v, i) => ({
               productId: created.id,
               label: v.label ?? null,
@@ -141,15 +148,17 @@ export async function POST(req: Request) {
               position: v.position ?? i,
               imageId: v.imageId ?? null,
             })),
-          });
-        }
-
-        if (valid.length) {
-          await tx.productImage.createMany({
+          }),
+        );
+      }
+      if (valid.length) {
+        writes.push(
+          prisma.productImage.createMany({
             data: valid.map((mediaId, i) => ({ productId: created.id, mediaId, position: i })),
-          });
-        }
-      });
+          }),
+        );
+      }
+      if (writes.length) await prisma.$transaction(writes);
     }
 
     return NextResponse.json({ ok: true });

@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import RichTextarea from '@/components/ui/rich-textarea';
 import {
   Select,
   SelectContent,
@@ -139,7 +140,8 @@ export default function ArticleForm({
         id: data.id || undefined,
         title: data.title ?? '',
         status: (data.status as NewsStatus) ?? 'DRAFT',
-        excerpt: data.excerpt ?? '',
+        // excerpt формируем автоматически из контента (до 300 символов)
+        excerpt: (data.content ?? '').slice(0, 300),
         content: data.content ?? '',
         date: dateISO,
         seoTitle: (data.seoTitle && data.seoTitle.trim()) || (data.title ?? null),
@@ -274,21 +276,13 @@ export default function ArticleForm({
             {errors.title && <p className="text-destructive mt-1 text-xs">{errors.title}</p>}
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm">Короткий опис (excerpt, до 300 символів)</label>
-            <Textarea
-              rows={4}
-              value={data.excerpt ?? ''}
-              onChange={(e) => dispatch(setField({ key: 'excerpt', value: e.target.value }))}
-            />
-          </div>
 
           <div>
             <label className="mb-1 block text-sm">Контент</label>
-            <Textarea
+            <RichTextarea
               rows={8}
               value={data.content ?? ''}
-              onChange={(e) => dispatch(setField({ key: 'content', value: e.target.value }))}
+              onChange={(v) => dispatch(setField({ key: 'content', value: v }))}
             />
           </div>
 
@@ -296,7 +290,7 @@ export default function ArticleForm({
           <div className="space-y-3">
             <div className="text-sm font-medium">Налаштування в пошукових системах</div>
 
-            <div className="bg-muted/30 rounded-lg border p-3">
+            <div className="bg-muted/30 rounded-lg border p-3 w-full max-w-[720px] break-words">
               <a
                 href={`${SITE}/uk/news/${previewSlug}`}
                 className="text-primary block text-lg underline-offset-4 hover:underline"
@@ -316,6 +310,11 @@ export default function ArticleForm({
                 value={data.seoTitle ?? ''}
                 onChange={(e) => dispatch(setField({ key: 'seoTitle', value: e.target.value }))}
               />
+              <div
+                className={`mt-1 text-right text-xs ${((data.seoTitle ?? '').trim().length > 60) ? 'text-amber-600' : 'text-muted-foreground'}`}
+              >
+                {((data.seoTitle ?? '').trim().length)} / 60
+              </div>
             </div>
 
             <div>
@@ -327,7 +326,13 @@ export default function ArticleForm({
                 onChange={(e) =>
                   dispatch(setField({ key: 'seoDescription', value: e.target.value }))
                 }
+                className="max-w-[720px] resize-y"
               />
+              <div
+                className={`mt-1 text-right text-xs ${((data.seoDescription ?? '').trim().length > 160) ? 'text-amber-600' : 'text-muted-foreground'}`}
+              >
+                {((data.seoDescription ?? '').trim().length)} / 160
+              </div>
             </div>
 
             <div>

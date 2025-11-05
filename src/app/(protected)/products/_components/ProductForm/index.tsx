@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import RichTextarea from '@/components/ui/rich-textarea';
 import {
   Select,
   SelectContent,
@@ -142,7 +143,6 @@ export default function ProductForm({
     }
   };
 
-  // удалить (thunk)
   const onDelete = async () => {
     if (!data.id) return setShowDelete(false);
     setDeleting(true);
@@ -280,11 +280,12 @@ export default function ProductForm({
 
           <div>
             <label className="mb-1 block text-sm">Опис продукту</label>
-            <Textarea
-              rows={6}
+            <RichTextarea
+              rows={8}
               value={data.description ?? ''}
-              onChange={(e) => dispatch(setField({ key: 'description', value: e.target.value }))}
+              onChange={(v) => dispatch(setField({ key: 'description', value: v }))}
               aria-invalid={!!errors.description}
+              placeholder={"Опис з підтримкою простого форматування: заголовки (# ## ###), списки, жирний/курсив, цитати, посилання…"}
             />
             {errors.description && (
               <p className="text-destructive mt-1 text-xs">{errors.description}</p>
@@ -302,7 +303,7 @@ export default function ProductForm({
           <div className="space-y-3">
             <div className="text-sm font-medium">Налаштування в пошукових системах</div>
 
-            <div className="bg-muted/30 rounded-lg border p-3">
+            <div className="bg-muted/30 rounded-lg border p-3 w-full max-w-[720px] break-words">
               <a
                 href={`${SITE}/uk/products/${previewSlug}`}
                 className="text-primary block text-lg underline-offset-4 hover:underline"
@@ -322,6 +323,11 @@ export default function ProductForm({
                 value={data.seoTitle ?? ''}
                 onChange={(e) => dispatch(setField({ key: 'seoTitle', value: e.target.value }))}
               />
+              <div
+                className={`mt-1 text-right text-xs ${((data.seoTitle ?? '').trim().length > 60) ? 'text-amber-600' : 'text-muted-foreground'}`}
+              >
+                {((data.seoTitle ?? '').trim().length)} / 60
+              </div>
             </div>
 
             <div>
@@ -333,7 +339,13 @@ export default function ProductForm({
                 onChange={(e) =>
                   dispatch(setField({ key: 'seoDescription', value: e.target.value }))
                 }
+                className="max-w-[720px] resize-y"
               />
+              <div
+                className={`mt-1 text-right text-xs ${((data.seoDescription ?? '').trim().length > 160) ? 'text-amber-600' : 'text-muted-foreground'}`}
+              >
+                {((data.seoDescription ?? '').trim().length)} / 160
+              </div>
             </div>
 
             <div>
