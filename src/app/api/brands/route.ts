@@ -27,7 +27,7 @@ export async function GET(req: Request) {
   };
 
   const [total, items] = await Promise.all([
-    prisma.brand.count({ where }),
+    prisma.brand.count({ where: { status: 'ACTIVE' } }),
     prisma.brand.findMany({
       where,
       orderBy: { name: 'asc' },
@@ -41,7 +41,7 @@ export async function GET(req: Request) {
         seoTitle: true,
         seoDescription: true,
         cover: { select: { url: true, width: true, height: true, alt: true } },
-        _count: { select: { products: true } },
+        _count: { select: { products: { where: { status: 'ACTIVE' } } } },
       },
     }),
   ]);
