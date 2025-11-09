@@ -42,6 +42,7 @@ export async function GET(req: Request) {
         slug: true,
         brand: { select: { id: true, name: true, slug: true } },
         cover: { select: { url: true, width: true, height: true, alt: true } },
+        translations: { where: { locale: 'en' }, select: { id: true, locale: true, name: true, slug: true, seoTitle: true, seoDescription: true } },
         variants: { select: { id: true, label: true, volumeMl: true, position: true } },
       },
     }),

@@ -6,6 +6,8 @@ import productsUi from './slices/productsUiSlice';
 import themeReducer from './slices/themeSlice';
 import seoReducer from './slices/defaultSeoSlice';
 import articleReducer from './slices/articles';
+import translateListReducer from './slices/translateListSlice';
+import translateDetailReducer from './slices/translateDetailSlice';
 
 export const store = configureStore({
   reducer: {
@@ -17,6 +19,8 @@ export const store = configureStore({
     productsUi,
     theme: themeReducer,
     seo: seoReducer,
+    translateList: translateListReducer,
+    translateDetail: translateDetailReducer,
   },
   devTools: process.env.NODE_ENV !== 'production',
   middleware: (getDefault) =>

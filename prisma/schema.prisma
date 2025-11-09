@@ -135,6 +135,7 @@ model Product {
   images  ProductImage[]
 
   variants ProductVariant[]
+  translations ProductTranslation[]
 
   seoTitle       String? @db.VarChar(60)
   seoDescription String? @db.VarChar(160)
@@ -163,6 +164,7 @@ model ProductVariant {
   createdAt  DateTime     @default(now())
   updatedAt  DateTime     @updatedAt
   MediaAsset MediaAsset[] @relation("VariantImage")
+  translations ProductVariantTranslation[]
 
   @@index([productId])
 }
@@ -269,4 +271,44 @@ model ArticleImage {
 
   @@id([articleId, mediaId])
   @@index([position])
+}
+
+// === Translations ===
+// Generic locale-based translation models for products and variants.
+// Keep extensible for future locales (currently we'll use 'en').
+
+enum TranslationLocale {
+  uk
+  en
+}
+
+model ProductTranslation {
+  id          String            @id @default(cuid())
+  productId   String
+  product     Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  locale      TranslationLocale @default(en)
+  name        String            @db.VarChar(200)
+  slug        String?           @db.VarChar(200)
+  description String?           @db.Text
+  seoTitle       String?        @db.VarChar(60)
+  seoDescription String?        @db.VarChar(160)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@unique([productId, locale])
+  @@index([locale])
+  @@unique([slug, locale])
+}
+
+model ProductVariantTranslation {
+  id         String            @id @default(cuid())
+  variantId  String
+  variant    ProductVariant    @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  locale     TranslationLocale @default(en)
+  label      String?           @db.VarChar(120)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@unique([variantId, locale])
+  @@index([locale])
 }
