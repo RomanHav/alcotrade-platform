@@ -201,12 +201,31 @@ model Brand {
   cover   MediaAsset? @relation(fields: [coverId], references: [id], onDelete: SetNull) // ⬅️ SET NULL
 
   products Product[]
+  translations BrandTranslation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([name])
   @@index([status])
+}
+
+model BrandTranslation {
+  id            String            @id @default(cuid())
+  brandId       String
+  brand         Brand             @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  locale        TranslationLocale @default(en)
+  name          String            @db.VarChar(200)
+  slug          String?           @db.VarChar(200)
+  description   String?           @db.Text
+  seoTitle       String?          @db.VarChar(60)
+  seoDescription String?          @db.VarChar(160)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@unique([brandId, locale])
+  @@index([locale])
+  @@unique([slug, locale])
 }
 
 model Partner {

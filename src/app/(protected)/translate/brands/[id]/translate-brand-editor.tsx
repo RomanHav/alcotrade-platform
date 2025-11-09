@@ -1,18 +1,16 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import RichTextarea from '@/components/ui/rich-textarea';
+import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { fetchTranslateProduct, saveTranslateProduct } from '@/store/operations/translate';
-import { hydrateFromServer, resetDraft, resetDraftToServer, setField, setVariantLabel } from '@/store/slices/translateDetailSlice';
+import { fetchTranslateBrand, saveTranslateBrand } from '@/store/operations/translateBrands';
+import { hydrateFromServer, resetDraftToServer, setField } from '@/store/slices/translateBrandDetailSlice';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
 import UnsavedBar from '@/components/common/UnsavedBar';
-
-type Variant = { id: string; label: string | null; position: number; translations: { id: string; label: string | null }[] };
+import { Loader2 } from 'lucide-react';
 
 type Initial = {
   id: string;
@@ -22,20 +20,19 @@ type Initial = {
   seoTitle: string | null;
   seoDescription: string | null;
   translations: { id: string; name: string; slug: string | null; description: string | null; seoTitle: string | null; seoDescription: string | null }[];
-  variants: Variant[];
+  _count: { products: number };
 };
 
-export default function TranslateEditor({ initial }: { initial: Initial }) {
+export default function TranslateBrandEditor({ initial }: { initial: Initial }) {
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const detail = useAppSelector((s) => s.translateDetail);
+  const detail = useAppSelector((s) => s.translateBrandDetail);
   const draft = detail.draft;
   const saving = detail.saving;
 
-  // Hydrate from server and fetch latest to ensure freshness
   useEffect(() => {
     dispatch(hydrateFromServer(initial as any));
-    dispatch(fetchTranslateProduct({ id: initial.id }));
+    dispatch(fetchTranslateBrand({ id: initial.id }));
   }, [dispatch, initial.id, initial]);
 
   const canSave = useMemo(() => {
@@ -43,9 +40,9 @@ export default function TranslateEditor({ initial }: { initial: Initial }) {
     return (
       draft.name.trim().length > 0 ||
       draft.description.trim().length > 0 ||
-      draft.variants.some((v) => (v.label ?? '').trim().length > 0) ||
       draft.seoTitle.trim().length > 0 ||
-      draft.seoDescription.trim().length > 0
+      draft.seoDescription.trim().length > 0 ||
+      draft.slug.trim().length > 0
     );
   }, [draft]);
 
@@ -53,15 +50,14 @@ export default function TranslateEditor({ initial }: { initial: Initial }) {
   const previewTitle = (draft?.seoTitle || draft?.name || initial.name || '').trim() || 'Мета-заголовок';
   const previewDesc = (draft?.seoDescription || draft?.description || initial.description || '')
     .trim()
-    .slice(0, 160) || 'Опис товару';
-  const previewSlug = (draft?.slug || draft?.name || initial.slug || 'product-slug')
+    .slice(0, 160) || 'Опис бренду';
+  const previewSlug = (draft?.slug || draft?.name || initial.slug || 'brand-slug')
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-|-$/g, '') || 'product';
+    .replace(/^-|-$/g, '') || 'brand';
   const SITE = process.env.NEXT_PUBLIC_SITE_URL || 'https://alcotrade.com.ua';
 
-  // Compute dirty state comparing draft to server baseline
   const isDirty = useMemo(() => {
     if (!detail.data || !draft) return false;
     const en = detail.data.translations?.[0] || null;
@@ -71,22 +67,16 @@ export default function TranslateEditor({ initial }: { initial: Initial }) {
       description: en?.description ?? '',
       seoTitle: en?.seoTitle ?? '',
       seoDescription: en?.seoDescription ?? '',
-      variantsMap: new Map(detail.data.variants.map((v) => [v.id, v.translations?.[0]?.label ?? ''])),
     };
-    if (draft.name !== base.name) return true;
-    if (draft.slug !== base.slug) return true;
-    if (draft.description !== base.description) return true;
-    if (draft.seoTitle !== base.seoTitle) return true;
-    if (draft.seoDescription !== base.seoDescription) return true;
-    if (draft.variants.length !== detail.data.variants.length) return true;
-    for (const v of draft.variants) {
-      const baseLabel = base.variantsMap.get(v.variantId) ?? '';
-      if ((v.label ?? '') !== baseLabel) return true;
-    }
-    return false;
+    return (
+      draft.name !== base.name ||
+      draft.slug !== base.slug ||
+      draft.description !== base.description ||
+      draft.seoTitle !== base.seoTitle ||
+      draft.seoDescription !== base.seoDescription
+    );
   }, [detail.data, draft]);
 
-  // Warn on page leave if dirty
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       if (!isDirty) return;
@@ -101,19 +91,17 @@ export default function TranslateEditor({ initial }: { initial: Initial }) {
     if (!draft) return;
     try {
       await (dispatch(
-        saveTranslateProduct({
+        saveTranslateBrand({
           id: initial.id,
           name: draft.name,
           slug: draft.slug,
           description: draft.description,
           seoTitle: draft.seoTitle,
           seoDescription: draft.seoDescription,
-          variants: draft.variants,
         }),
       ) as any).unwrap();
-      toast.success('Переклад збережено', { description: 'EN-версію успішно оновлено.' });
-      // Навигация сразу после показа тоста, без startTransition — как в BrandForm
-      router.push('/translate/products');
+      toast.success('Переклад бренду збережено', { description: 'EN-версія успішно оновлена.' });
+      router.push('/translate/brands');
     } catch (e: any) {
       if (e?.message === 'slug_taken') {
         toast.error('Посилання (slug) зайняте', { description: 'Оберіть інший slug для EN.' });
@@ -125,7 +113,6 @@ export default function TranslateEditor({ initial }: { initial: Initial }) {
 
   return (
     <div className="grid grid-cols-2 gap-6">
-      {/* Bottom sticky action bar (reuse common component) */}
       <UnsavedBar
         visible={isDirty}
         onCancel={() => {
@@ -140,12 +127,12 @@ export default function TranslateEditor({ initial }: { initial: Initial }) {
         <h3 className="mb-3 text-lg font-medium">Оригінал (uk)</h3>
         <div className="grid gap-3 text-sm opacity-80">
           <div>
-            <div className="mb-1 text-[11px] uppercase tracking-wide opacity-60">Назва</div>
+            <div className="mb-1 text-[11px] uppercase tracking-wide opacity-60">Назва бренду</div>
             <div className="rounded border border-neutral-200 bg-neutral-50 p-2 text-sm dark:border-neutral-800 dark:bg-neutral-900">{initial.name}</div>
           </div>
           <div>
-            <div className="mb-1 text-[11px] uppercase tracking-wide opacity-60">Опис</div>
-            <div className="max-h-64 overflow-y-auto whitespace-pre-wrap rounded border border-neutral-200 bg-neutral-50 p-2 text-sm dark:border-neutral-800 dark:bg-neutral-900">{initial.description || '—'}</div>
+            <div className="mb-1 text-[11px] uppercase tracking-wide opacity-60">Опис бренду</div>
+            <div className="whitespace-pre-wrap rounded border border-neutral-200 bg-neutral-50 p-2 text-sm dark:border-neutral-800 dark:bg-neutral-900">{initial.description || '—'}</div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -158,15 +145,8 @@ export default function TranslateEditor({ initial }: { initial: Initial }) {
             </div>
           </div>
           <div>
-            <div className="mb-2 text-[11px] uppercase tracking-wide opacity-60">Варіанти</div>
-            <div className="grid gap-2">
-              {initial.variants.map((v) => (
-                <div key={v.id} className="flex items-center justify-between rounded border border-neutral-200 bg-neutral-50 px-2 py-1 text-sm dark:border-neutral-800 dark:bg-neutral-900">
-                  <span className="opacity-70">{v.label || '—'}</span>
-                  <span className="text-[11px] opacity-50">pos {v.position}</span>
-                </div>
-              ))}
-            </div>
+            <div className="mb-2 text-[11px] uppercase tracking-wide opacity-60">Кількість продуктів</div>
+            <div className="rounded border border-neutral-200 bg-neutral-50 p-2 text-sm dark:border-neutral-800 dark:bg-neutral-900">{initial._count.products}</div>
           </div>
         </div>
       </div>
@@ -214,14 +194,14 @@ export default function TranslateEditor({ initial }: { initial: Initial }) {
           <div className="space-y-3 rounded-lg border border-neutral-200 bg-neutral-50 p-3 text-xs dark:border-neutral-800 dark:bg-neutral-900">
             <div className="text-[11px] font-semibold uppercase tracking-wide opacity-60">Перегляд SEO</div>
             <a
-              href={`${SITE}/en/products/${previewSlug}`}
+              href={`${SITE}/en/brands/${previewSlug}`}
               className="text-primary block text-sm underline-offset-4 hover:underline"
               target="_blank"
               rel="noopener noreferrer"
             >
               {previewTitle}
             </a>
-            <div className="opacity-70">{SITE}/en/products/<span className="opacity-90">{previewSlug}</span></div>
+            <div className="opacity-70">{SITE}/en/brands/<span className="opacity-90">{previewSlug}</span></div>
             <div className="mt-1 whitespace-pre-wrap opacity-80">{previewDesc}</div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -236,21 +216,8 @@ export default function TranslateEditor({ initial }: { initial: Initial }) {
               <div className={`mt-1 text-right text-[11px] ${((draft?.seoDescription ?? '').trim().length > 160) ? 'text-amber-600' : 'opacity-60'}`}>{(draft?.seoDescription ?? '').trim().length} / 160</div>
             </div>
           </div>
-
-          <div>
-            <div className="mb-2 text-[11px] uppercase tracking-wide opacity-60">Варіанти (EN)</div>
-            <div className="grid gap-2">
-              {draft?.variants.map((v, idx) => (
-                <div key={v.variantId} className="grid grid-cols-2 items-center gap-3">
-                  <div className="text-xs opacity-60">{initial.variants[idx]?.label || '—'}</div>
-                  <Input value={v.label ?? ''} onChange={(e) => dispatch(setVariantLabel({ variantId: v.variantId, label: e.target.value }))} placeholder="Label EN" />
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
-
     </div>
   );
 }

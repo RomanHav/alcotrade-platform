@@ -8,6 +8,8 @@ import seoReducer from './slices/defaultSeoSlice';
 import articleReducer from './slices/articles';
 import translateListReducer from './slices/translateListSlice';
 import translateDetailReducer from './slices/translateDetailSlice';
+import translateBrandListReducer from './slices/translateBrandListSlice';
+import translateBrandDetailReducer from './slices/translateBrandDetailSlice';
 
 export const store = configureStore({
   reducer: {
@@ -21,6 +23,8 @@ export const store = configureStore({
     seo: seoReducer,
     translateList: translateListReducer,
     translateDetail: translateDetailReducer,
+  translateBrandList: translateBrandListReducer,
+  translateBrandDetail: translateBrandDetailReducer,
   },
   devTools: process.env.NODE_ENV !== 'production',
   middleware: (getDefault) =>
