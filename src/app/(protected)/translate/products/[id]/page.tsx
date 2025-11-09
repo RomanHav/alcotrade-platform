@@ -3,9 +3,10 @@ import { ChevronRight } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import TranslateEditor from './translate-editor';
 
-export default async function TranslateProductPage({ params }: { params: { id: string } }) {
+export default async function TranslateProductPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const product = await prisma.product.findUnique({
-    where: { id: params.id },
+    where: { id },
     select: {
       id: true,
       name: true,
