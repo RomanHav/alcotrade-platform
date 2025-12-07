@@ -10,6 +10,7 @@ import translateListReducer from './slices/translateListSlice';
 import translateDetailReducer from './slices/translateDetailSlice';
 import translateBrandListReducer from './slices/translateBrandListSlice';
 import translateBrandDetailReducer from './slices/translateBrandDetailSlice';
+import translateMainPageReducer from './slices/translateMainPageSlice';
 
 export const store = configureStore({
   reducer: {
@@ -25,6 +26,7 @@ export const store = configureStore({
     translateDetail: translateDetailReducer,
   translateBrandList: translateBrandListReducer,
   translateBrandDetail: translateBrandDetailReducer,
+  translateMainPage: translateMainPageReducer,
   },
   devTools: process.env.NODE_ENV !== 'production',
   middleware: (getDefault) =>

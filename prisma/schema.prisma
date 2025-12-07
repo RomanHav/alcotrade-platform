@@ -4,8 +4,6 @@ generator client {
 
 datasource db {
   provider     = "postgresql"
-  url          = env("DATABASE_URL")
-  directUrl    = env("DIRECT_DATABASE_URL")
   relationMode = "foreignKeys"
 }
 
@@ -330,4 +328,34 @@ model ProductVariantTranslation {
 
   @@unique([variantId, locale])
   @@index([locale])
+}
+
+// === Main Page Section Translations ===
+// Stores translatable content for all sections of the main page.
+// Each section has a unique key identifier.
+
+model MainPageSection {
+  id          String   @id @default(cuid())
+  key         String   @unique // e.g. "hero", "about", "brands", "capabilities", "partners"
+  position    Int      @default(0)
+  isVisible   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items MainPageSectionItem[]
+}
+
+model MainPageSectionItem {
+  id          String   @id @default(cuid())
+  sectionId   String
+  section     MainPageSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  key         String   // e.g. "title", "description", "buttonText", "item1Title", etc.
+  valueUk     String   @db.Text
+  valueEn     String?  @db.Text
+  position    Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([sectionId, key])
+  @@index([sectionId])
 }
