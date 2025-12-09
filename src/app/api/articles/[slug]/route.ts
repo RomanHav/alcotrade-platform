@@ -1,17 +1,19 @@
+// app/api/articles/[slug]/route.ts
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(
   req: Request,
-  { params }: { params: { slug: string } }
+  props: { params: Promise<{ slug: string }> }
 ) {
   try {
+    const { slug } = await props.params;
     const { searchParams } = new URL(req.url);
     const locale = searchParams.get('locale') || 'uk';
 
     const article = await prisma.article.findFirst({
       where: {
-        slug: params.slug,
+        slug,
         locale,
         status: 'ACTIVE',
       },
