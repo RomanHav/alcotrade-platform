@@ -4,9 +4,8 @@ import { prisma } from '@/lib/prisma';
 import NewsList from './_components/NewsList';
 
 export default async function TranslateNewsPage() {
-  // Get all UK articles
-  const ukArticles = await prisma.article.findMany({
-    where: { locale: 'uk' },
+  // Get all articles with their translations
+  const articles = await prisma.article.findMany({
     orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
     select: {
       id: true,
@@ -16,23 +15,14 @@ export default async function TranslateNewsPage() {
       date: true,
       updatedAt: true,
       cover: { select: { url: true, alt: true } },
+      translations: {
+        where: { locale: 'en' },
+        select: { id: true },
+      },
     },
   });
 
-  // Find corresponding EN articles by slug
-  const slugs = ukArticles.map((a) => a.slug);
-  const enArticles = await prisma.article.findMany({
-    where: {
-      locale: 'en',
-      slug: { in: slugs },
-    },
-    select: {
-      slug: true,
-    },
-  });
-  const enSlugsSet = new Set(enArticles.map((a) => a.slug));
-
-  const rows = ukArticles.map((a) => ({
+  const rows = articles.map((a) => ({
     id: a.id,
     title: a.title,
     slug: a.slug,
@@ -40,7 +30,7 @@ export default async function TranslateNewsPage() {
     date: a.date?.toISOString() || null,
     updatedAt: a.updatedAt.toISOString(),
     coverUrl: a.cover?.url || null,
-    hasEn: enSlugsSet.has(a.slug),
+    hasEn: a.translations.length > 0,
   }));
 
   return (
