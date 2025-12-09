@@ -48,7 +48,7 @@ export async function GET(req: Request) {
     const page = parseIntSafe(searchParams.get('page'), 1);
     const pageSize = Math.min(100, parseIntSafe(searchParams.get('pageSize'), 10));
     const query = searchParams.get('query')?.trim() || '';
-    const locale = searchParams.get('locale')?.trim() || null; // <-- ДОБАВЛЕНО
+    const locale = searchParams.get('locale')?.trim() || 'uk'; // default to 'uk' to show only main articles 
 
     const status = searchParams.get('status') as 'DRAFT' | 'ACTIVE' | 'ARCHIVE' | null;
 
@@ -56,6 +56,7 @@ export async function GET(req: Request) {
     const sort = searchParams.get('sort') || 'date_desc';
 
     const where: Prisma.ArticleWhereInput = {
+      locale,
       ...(query && {
         OR: [
           { title: { contains: query, mode: 'insensitive' } },
@@ -64,10 +65,7 @@ export async function GET(req: Request) {
         ],
       }),
       ...(status ? { status } : {}),
-      ...(locale ? { locale } : {}), 
-    };
-
-    if (dateParam) {
+    };    if (dateParam) {
       const gte = startOfDayISO(dateParam);
       const lt = nextDayISO(dateParam);
       if (gte && lt) {
