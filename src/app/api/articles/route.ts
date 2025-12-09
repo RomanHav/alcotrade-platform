@@ -27,18 +27,9 @@ function sortToOrderBy(sort?: string): Prisma.ArticleOrderByWithRelationInput[] 
     case 'name_desc':
       return [{ title: 'desc' }];
     case 'date_desc':
-      // coalesce(date, publishedAt) desc — емулюємо подвійним orderBy
-      return [
-        // @ts-expect-error Prisma 5.13+ може підтримувати nulls
-        { date: { sort: 'desc', nulls: 'last' } as any } || ({ date: 'desc' } as any),
-        { publishedAt: 'desc' },
-      ] as any;
+      return [{ date: 'desc' }, { publishedAt: 'desc' }];
     case 'date_asc':
-      return [
-        // @ts-expect-error (див. коментар вище)
-        { date: { sort: 'asc', nulls: 'last' } as any } || ({ date: 'asc' } as any),
-        { publishedAt: 'asc' },
-      ] as any;
+      return [{ date: 'asc' }, { publishedAt: 'asc' }];
     case 'status':
       return [{ status: 'asc' }];
     case 'updated_desc':
@@ -57,11 +48,12 @@ export async function GET(req: Request) {
     const page = parseIntSafe(searchParams.get('page'), 1);
     const pageSize = Math.min(100, parseIntSafe(searchParams.get('pageSize'), 10));
     const query = searchParams.get('query')?.trim() || '';
+    const locale = searchParams.get('locale')?.trim() || null; // <-- ДОБАВЛЕНО
 
     const status = searchParams.get('status') as 'DRAFT' | 'ACTIVE' | 'ARCHIVE' | null;
 
     const dateParam = searchParams.get('date')?.trim() || '';
-    const sort = searchParams.get('sort') || 'name_asc';
+    const sort = searchParams.get('sort') || 'date_desc';
 
     const where: Prisma.ArticleWhereInput = {
       ...(query && {
@@ -72,6 +64,7 @@ export async function GET(req: Request) {
         ],
       }),
       ...(status ? { status } : {}),
+      ...(locale ? { locale } : {}), 
     };
 
     if (dateParam) {
@@ -100,7 +93,8 @@ export async function GET(req: Request) {
           publishedAt: true,
           slug: true,
           locale: true,
-          cover: { select: { id: true, url: true, alt: true } },
+          excerpt: true,
+          cover: { select: { id: true, url: true, alt: true, width: true, height: true } },
         },
       }),
     ]);
