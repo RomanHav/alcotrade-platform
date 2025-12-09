@@ -11,9 +11,8 @@ export async function GET(req: Request) {
   const status = (searchParams.get('status') as NewsStatus | null) || undefined;
   const missingOnly = (searchParams.get('missingOnly') || 'false') === 'true';
 
-  // Get all UK articles
-  const whereUk: Prisma.ArticleWhereInput = {
-    locale: 'uk',
+  // Get all articles with their translations
+  const whereArticle: Prisma.ArticleWhereInput = {
     ...(status ? { status } : {}),
     ...(q
       ? {
@@ -24,12 +23,20 @@ export async function GET(req: Request) {
           ],
         }
       : {}),
+    // Filter by missing translation if needed
+    ...(missingOnly
+      ? {
+          translations: {
+            none: { locale: 'en' },
+          },
+        }
+      : {}),
   };
 
-  const [total, ukArticles] = await Promise.all([
-    prisma.article.count({ where: whereUk }),
+  const [total, articles] = await Promise.all([
+    prisma.article.count({ where: whereArticle }),
     prisma.article.findMany({
-      where: whereUk,
+      where: whereArticle,
       orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
       skip: (page - 1) * limit,
       take: limit,
@@ -41,25 +48,15 @@ export async function GET(req: Request) {
         date: true,
         updatedAt: true,
         cover: { select: { url: true, alt: true } },
+        translations: {
+          where: { locale: 'en' },
+          select: { id: true },
+        },
       },
     }),
   ]);
 
-  // Find corresponding EN articles by slug
-  const slugs = ukArticles.map((a) => a.slug);
-  const enArticles = await prisma.article.findMany({
-    where: {
-      locale: 'en',
-      slug: { in: slugs },
-    },
-    select: {
-      slug: true,
-      id: true,
-    },
-  });
-  const enSlugsSet = new Set(enArticles.map((a) => a.slug));
-
-  let items = ukArticles.map((a) => ({
+  const items = articles.map((a) => ({
     id: a.id,
     title: a.title,
     slug: a.slug,
@@ -67,17 +64,12 @@ export async function GET(req: Request) {
     date: a.date?.toISOString() || null,
     updatedAt: a.updatedAt.toISOString(),
     coverUrl: a.cover?.url || null,
-    hasEn: enSlugsSet.has(a.slug),
+    hasEn: a.translations.length > 0,
   }));
-
-  // Filter by missing EN if needed
-  if (missingOnly) {
-    items = items.filter((a) => !a.hasEn);
-  }
 
   return NextResponse.json({
     items,
-    total: missingOnly ? items.length : total,
+    total,
     page,
     limit,
   });
