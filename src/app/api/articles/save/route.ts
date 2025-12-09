@@ -14,7 +14,6 @@ const bodySchema = z.object({
   seoDescription: z.string().max(160).optional().nullable(),
   coverId: z.string().optional().nullable(),
   slug: z.string().min(1),
-  locale: z.string().min(2).max(5).optional().default('uk'),
 });
 
 function parseDateISO(v?: string | null) {
@@ -28,10 +27,10 @@ export async function POST(req: Request) {
     const raw = await req.json();
     const data = bodySchema.parse(raw);
 
+    // Check if slug is already taken by another article
     const conflict = await prisma.article.findFirst({
       where: {
         slug: data.slug,
-        locale: data.locale,
         ...(data.id ? { id: { not: data.id } } : {}),
       },
       select: { id: true },
@@ -50,9 +49,8 @@ export async function POST(req: Request) {
       seoDescription: data.seoDescription ?? null,
       coverId: data.coverId ?? null,
       slug: data.slug,
-      locale: data.locale,
     };
-    console.log(common);
+
     if (data.id) {
       const updated = await prisma.article.update({
         where: { id: data.id },
