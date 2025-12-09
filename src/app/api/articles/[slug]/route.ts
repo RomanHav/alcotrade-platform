@@ -2,7 +2,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-
 export async function GET(
   req: Request,
   props: { params: Promise<{ slug: string }> }
@@ -11,6 +10,11 @@ export async function GET(
     const { slug } = await props.params;
     const { searchParams } = new URL(req.url);
     const locale = searchParams.get('locale') || 'uk';
+
+    const allWithSlug = await prisma.article.findMany({
+      where: { slug },
+      select: { id: true, slug: true, locale: true, status: true, title: true }
+    });
 
     const article = await prisma.article.findFirst({
       where: {
@@ -58,12 +62,17 @@ export async function GET(
       },
     });
 
+
     if (!article) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      return NextResponse.json({ 
+        error: 'Not found',
+        debug: { slug, locale, allWithSlug }
+      }, { status: 404 });
     }
 
     return NextResponse.json(article);
   } catch (e: any) {
+    console.error('Article API error:', e);
     return NextResponse.json({ error: e?.message ?? 'Failed' }, { status: 500 });
   }
 }
