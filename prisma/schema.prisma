@@ -258,8 +258,7 @@ model Article {
   date    DateTime? // поле "Дата" у формі (для показу/сорту)
   status  NewsStatus @default(DRAFT)
 
-  slug   String
-  locale String @default("uk") @db.VarChar(5)
+  slug   String  @unique
 
   seoTitle       String? @db.VarChar(60)
   seoDescription String? @db.VarChar(160)
@@ -267,13 +266,13 @@ model Article {
   coverId String?
   cover   MediaAsset?    @relation(fields: [coverId], references: [id], onDelete: SetNull)
   images  ArticleImage[]
+  translations ArticleTranslation[]
 
   publishedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([slug, locale])
   @@index([status])
   @@index([date])
   @@index([publishedAt])
@@ -289,6 +288,25 @@ model ArticleImage {
 
   @@id([articleId, mediaId])
   @@index([position])
+}
+
+model ArticleTranslation {
+  id             String            @id @default(cuid())
+  articleId      String
+  article        Article           @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  locale         TranslationLocale @default(en)
+  title          String            @db.VarChar(200)
+  slug           String?           @db.VarChar(200)
+  excerpt        String?           @db.VarChar(300)
+  content        String?           @db.Text
+  seoTitle       String?           @db.VarChar(60)
+  seoDescription String?           @db.VarChar(160)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@unique([articleId, locale])
+  @@unique([slug, locale])
+  @@index([locale])
 }
 
 // === Translations ===

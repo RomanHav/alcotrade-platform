@@ -48,7 +48,6 @@ export async function GET(req: Request) {
     const page = parseIntSafe(searchParams.get('page'), 1);
     const pageSize = Math.min(100, parseIntSafe(searchParams.get('pageSize'), 10));
     const query = searchParams.get('query')?.trim() || '';
-    const locale = searchParams.get('locale')?.trim() || 'uk'; // default to 'uk' to show only main articles 
 
     const status = searchParams.get('status') as 'DRAFT' | 'ACTIVE' | 'ARCHIVE' | null;
 
@@ -56,7 +55,6 @@ export async function GET(req: Request) {
     const sort = searchParams.get('sort') || 'date_desc';
 
     const where: Prisma.ArticleWhereInput = {
-      locale,
       ...(query && {
         OR: [
           { title: { contains: query, mode: 'insensitive' } },
@@ -65,7 +63,9 @@ export async function GET(req: Request) {
         ],
       }),
       ...(status ? { status } : {}),
-    };    if (dateParam) {
+    };
+
+    if (dateParam) {
       const gte = startOfDayISO(dateParam);
       const lt = nextDayISO(dateParam);
       if (gte && lt) {
@@ -90,14 +90,24 @@ export async function GET(req: Request) {
           date: true,
           publishedAt: true,
           slug: true,
-          locale: true,
           excerpt: true,
           cover: { select: { id: true, url: true, alt: true, width: true, height: true } },
+          translations: {
+            where: { locale: 'en' },
+            select: { id: true },
+          },
         },
       }),
     ]);
 
-    return NextResponse.json({ items, total });
+    // Add hasTranslation flag
+    const itemsWithTranslation = items.map((item) => ({
+      ...item,
+      hasEnTranslation: item.translations.length > 0,
+      translations: undefined,
+    }));
+
+    return NextResponse.json({ items: itemsWithTranslation, total });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? 'Failed' }, { status: 500 });
   }

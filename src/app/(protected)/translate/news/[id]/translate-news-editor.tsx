@@ -17,6 +17,7 @@ type Initial = {
     id: string;
     title: string;
     slug: string;
+    excerpt: string | null;
     content: string | null;
     date: string | null;
     status: string;
@@ -27,7 +28,8 @@ type Initial = {
   en: {
     id: string;
     title: string;
-    slug: string;
+    slug: string | null;
+    excerpt: string | null;
     content: string | null;
     seoTitle: string | null;
     seoDescription: string | null;
