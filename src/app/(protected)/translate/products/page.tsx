@@ -1,38 +1,38 @@
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
-import ProductList from './_components/ProductList';
+import ProductList from '@/app/(protected)/translate/products/_components/ProductList';
 
-export default async function ProductTranslate() {
-  const products = await prisma.product.findMany({
-    orderBy: { updatedAt: 'desc' },
-    select: {
-      id: true,
-      name: true,
-      slug: true,
-      status: true,
-      updatedAt: true,
-      brand: { select: { id: true, name: true, slug: true } },
-      cover: { select: { url: true, alt: true } },
-      translations: {
-        where: { locale: 'en' },
-        select: { id: true },
+export default async function TranslateProductsPage() {
+  const [products, brands] = await Promise.all([
+    prisma.product.findMany({
+      orderBy: { sortOrder: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        status: true,
+        updatedAt: true,
+        translations: { where: { locale: 'en' }, select: { id: true } },
+        brand: { select: { name: true } },
       },
-      _count: { select: { variants: true } },
-      variants: { select: { id: true, label: true, position: true } },
-    },
-  });
+      take: 100,
+    }),
+    prisma.brand.findMany({
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true },
+    }),
+  ]);
+
   const rows = products.map((p) => ({
     id: p.id,
     name: p.name,
     slug: p.slug,
     status: p.status,
     updatedAt: p.updatedAt.toISOString(),
-    brand: p.brand,
     hasEn: p.translations.length > 0,
-    variantsCount: p._count.variants,
+    brandName: p.brand?.name,
   }));
-  const brands = await prisma.brand.findMany({ select: { id: true, name: true, slug: true } });
 
   return (
     <div className="flex flex-col px-8 pt-7">
@@ -44,11 +44,11 @@ export default async function ProductTranslate() {
           <ChevronRight className="h-5 w-5 opacity-60" />
           <span className="opacity-80">Продукти</span>
         </div>
-        <h1 className="text-4xl font-semibold">Переклад</h1>
+        <h1 className="text-4xl font-semibold">Переклад продуктів</h1>
       </div>
       <div className="flex flex-col gap-5 rounded-2xl border border-neutral-200 bg-neutral-50 p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
         <h2 className="text-2xl font-medium">Продукти</h2>
-        <ProductList initial={rows as any} brands={brands as any} />
+        <ProductList initial={rows} brands={brands} />
       </div>
     </div>
   );
