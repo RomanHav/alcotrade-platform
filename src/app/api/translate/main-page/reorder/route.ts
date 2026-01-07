@@ -1,5 +1,6 @@
 // src/app/api/translate/main-page/reorder/route.ts
 import { NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 
 export async function GET() {
@@ -40,9 +41,34 @@ export async function POST(request: Request) {
       )
     );
 
+    revalidateTag('sections');
+
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error('Error reordering sections:', error);
     return NextResponse.json({ error: 'Failed to reorder sections' }, { status: 500 });
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const body = await request.json();
+    const { id, isVisible } = body as { id: string; isVisible?: boolean };
+
+    if (!id) {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
+
+    await prisma.mainPageSection.update({
+      where: { id },
+      data: { isVisible },
+    });
+
+    revalidateTag('sections');
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error updating section:', error);
+    return NextResponse.json({ error: 'Failed to update' }, { status: 500 });
   }
 }
