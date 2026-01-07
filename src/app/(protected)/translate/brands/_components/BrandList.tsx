@@ -49,7 +49,7 @@ export default function BrandList({ initial }: { initial: RowItem[] }) {
             className="h-9"
           />
           <div className="grid grid-cols-2 gap-2">
-            <Select value={status ?? undefined} onValueChange={(v) => dispatch(setStatus(v === 'all' ? undefined : v))}>
+            <Select value={status ?? 'all'} onValueChange={(v) => dispatch(setStatus(v === 'all' ? undefined : v))}>
               <SelectTrigger className="h-9">
                 <SelectValue placeholder="Статус" />
               </SelectTrigger>
@@ -67,39 +67,41 @@ export default function BrandList({ initial }: { initial: RowItem[] }) {
           </label>
         </div>
         <div className="flex-1 overflow-y-auto">
-          <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
-            {items.map((b) => (
-              <li key={b.id} className="group">
-                <Link
-                  href={`/translate/brands/${b.id}`}
-                  className={cn(
-                    'flex flex-col gap-1 px-4 py-3 text-sm transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-900',
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">{b.name}</span>
-                    {!b.hasEn && (
-                      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                        NO EN
-                      </span>
+          {loading && (
+            <div className="flex items-center justify-center gap-2 px-4 py-4 text-xs text-neutral-500">
+              <Loader2 className="h-4 w-4 animate-spin" /> Оновлення...
+            </div>
+          )}
+          {!loading && items.length === 0 && (
+            <div className="px-4 py-6 text-center text-xs opacity-60">Нічого не знайдено</div>
+          )}
+          {!loading && items.length > 0 && (
+            <ul className="divide-y divide-neutral-100 dark:divide-neutral-800">
+              {items.map((b) => (
+                <li key={b.id} className="group">
+                  <Link
+                    href={`/translate/brands/${b.id}`}
+                    className={cn(
+                      'flex flex-col gap-1 px-4 py-3 text-sm transition-colors hover:bg-neutral-50 dark:hover:bg-neutral-900',
                     )}
-                  </div>
-                  <div className="flex items-center justify-between text-[11px] opacity-70">
-                    <span>Продуктів: {b.productsCount}</span>
-                    <span>{format(new Date(b.updatedAt), 'dd.MM.y HH:mm', { locale: uk })}</span>
-                  </div>
-                </Link>
-              </li>
-            ))}
-            {loading && (
-              <li className="flex items-center justify-center gap-2 px-4 py-4 text-xs text-neutral-500">
-                <Loader2 className="h-4 w-4 animate-spin" /> Оновлення...
-              </li>
-            )}
-            {!loading && items.length === 0 && (
-              <li className="px-4 py-6 text-center text-xs opacity-60">Нічого не знайдено</li>
-            )}
-          </ul>
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{b.name}</span>
+                      {!b.hasEn && (
+                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
+                          NO EN
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] opacity-70">
+                      <span>Продуктів: {b.productsCount}</span>
+                      <span>{format(new Date(b.updatedAt), 'dd.MM.y HH:mm', { locale: uk })}</span>
+                    </div>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </div>
       <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-neutral-300 text-sm text-neutral-500 dark:border-neutral-700 dark:text-neutral-400">

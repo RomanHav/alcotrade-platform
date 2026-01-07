@@ -143,6 +143,8 @@ model Product {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
+  sortOrder    Int      @default(0)
+
   @@index([name])
   @@index([status])
   @@index([brandId])
@@ -204,6 +206,8 @@ model Brand {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  sortOrder    Int      @default(0)
 
   @@index([name])
   @@index([status])

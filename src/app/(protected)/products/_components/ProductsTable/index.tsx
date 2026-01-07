@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { X, Pencil } from 'lucide-react';
+import { X, Pencil, GripVertical } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { clearSelection, setSelectedIds } from '@/store/slices/productsUiSlice';
 import StatusBadge from './StatusBadge';
@@ -35,6 +35,25 @@ import { toast } from 'sonner';
 import { AnimatePresence, motion } from 'framer-motion';
 import SelectionBar from '@/components/common/SelectionBar';
 import Link from 'next/link';
+import {
+  closestCenter,
+  DndContext,
+  DragEndEvent,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import { cn } from '@/lib/utils';
 
 type Item = {
   id: string;
@@ -120,8 +139,65 @@ export default function ProductsTable({
     [rowSelection, selectedIds, pageIds, dispatch],
   );
 
+  const [localItems, setLocalItems] = React.useState(items);
+  const [reordering, setReordering] = React.useState(false);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  React.useEffect(() => {
+    setLocalItems(items);
+  }, [items]);
+
+  const isDragEnabled = !sp.get('query') && !sp.get('status') && !sp.get('brand') && !sp.get('sort');
+
+  const onDragEnd = async (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = localItems.findIndex((i) => i.id === active.id);
+    const newIndex = localItems.findIndex((i) => i.id === over.id);
+    if (oldIndex < 0 || newIndex < 0) return;
+
+    const newItems = arrayMove([...localItems], oldIndex, newIndex);
+    setLocalItems(newItems);
+    setReordering(true);
+
+    try {
+      const response = await fetch('/api/products/reorder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderedIds: newItems.map((item) => item.id) }),
+      });
+
+      if (!response.ok) {
+        toast.error('Не вдалося зберегти порядок');
+        setLocalItems(items);
+      } else {
+        toast.success('Порядок збережено');
+      }
+    } catch (error) {
+      toast.error('Помилка збереження');
+      setLocalItems(items);
+    } finally {
+      setReordering(false);
+    }
+  };
+
   const columns = React.useMemo<ColumnDef<Item>[]>(
     () => [
+      ...(isDragEnabled
+        ? [
+            {
+              id: 'drag',
+              header: () => null,
+              cell: () => null,
+              size: 40,
+            } as ColumnDef<Item>,
+          ]
+        : []),
       {
         id: 'select',
         header: ({ table }) => {
@@ -194,12 +270,12 @@ export default function ProductsTable({
         size: 80,
       },
     ],
-    [],
+    [isDragEnabled],
   );
 
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const table = useReactTable({
-    data: items,
+    data: localItems,
     columns,
     state: { rowSelection, sorting },
     onRowSelectionChange: handleRowSelectionChange,
@@ -287,6 +363,47 @@ export default function ProductsTable({
   if (sp.get('query'))
     activeFilters.push({ label: `Назва продукту: ${sp.get('query')}`, key: 'query' });
   if (sp.get('status')) activeFilters.push({ label: `Статус: ${sp.get('status')}`, key: 'status' });
+
+  const TableContent = (
+    <Table>
+      <TableHeader>
+        {table.getHeaderGroups().map((hg) => (
+          <TableRow key={hg.id}>
+            {hg.headers.map((h) => (
+              <TableHead key={h.id} style={{ width: h.getSize() ?? undefined }}>
+                {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
+              </TableHead>
+            ))}
+          </TableRow>
+        ))}
+      </TableHeader>
+      <TableBody>
+        {table.getRowModel().rows.map((r, i) =>
+          isDragEnabled ? (
+            <SortableRow key={r.id} id={r.id} disabled={reordering} index={i}>
+              {r.getVisibleCells().map((c) => (
+                <TableCell key={c.id} style={{ width: c.column.getSize() ?? undefined }}>
+                  {flexRender(c.column.columnDef.cell, c.getContext())}
+                </TableCell>
+              ))}
+            </SortableRow>
+          ) : (
+            <TableRow
+              key={r.id}
+              data-state={r.getIsSelected() && 'selected'}
+              className={`${i % 2 === 1 && 'bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700'} transition-colors`}
+            >
+              {r.getVisibleCells().map((c) => (
+                <TableCell key={c.id} style={{ width: c.column.getSize() ?? undefined }} className="transition-colors">
+                  {flexRender(c.column.columnDef.cell, c.getContext())}
+                </TableCell>
+              ))}
+            </TableRow>
+          )
+        )}
+      </TableBody>
+    </Table>
+  );
 
   return (
     <motion.div
@@ -377,34 +494,23 @@ export default function ProductsTable({
 
       {/* table */}
       <motion.div layout className="overflow-x-auto rounded-lg border">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((hg) => (
-              <TableRow key={hg.id}>
-                {hg.headers.map((h) => (
-                  <TableHead key={h.id} style={{ width: h.getSize() ?? undefined }}>
-                    {h.isPlaceholder ? null : flexRender(h.column.columnDef.header, h.getContext())}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows.map((r, i) => (
-              <TableRow
-                key={r.id}
-                data-state={r.getIsSelected() && 'selected'}
-                className={`${i % 2 === 1 && 'bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700'} transition-colors`}
-              >
-                {r.getVisibleCells().map((c) => (
-                  <TableCell key={c.id} className={`transition-colors`}>
-                    {flexRender(c.column.columnDef.cell, c.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+        {isDragEnabled ? (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={onDragEnd}
+            modifiers={[restrictToVerticalAxis]}
+          >
+            <SortableContext
+              items={localItems.map((i) => i.id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {TableContent}
+            </SortableContext>
+          </DndContext>
+        ) : (
+          TableContent
+        )}
       </motion.div>
 
       {/* pagination */}
@@ -440,5 +546,61 @@ export default function ProductsTable({
         onConfirm={onBulkDelete}
       />
     </motion.div>
+  );
+}
+
+function SortableRow({
+  id,
+  disabled,
+  index,
+  children,
+}: {
+  id: string;
+  disabled: boolean;
+  index: number;
+  children: React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
+  return (
+    <TableRow
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        isDragging && 'shadow-lg relative opacity-90',
+        index % 2 === 1 && 'bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700',
+        'transition-colors'
+      )}
+    >
+      {React.Children.map(children, (child, childIndex) => {
+        if (childIndex === 0) {
+          return (
+            <TableCell style={{ width: 40 }}>
+              <div
+                {...attributes}
+                {...listeners}
+                className={cn(
+                  'flex shrink-0 cursor-grab items-center justify-center touch-none',
+                  isDragging && 'cursor-grabbing',
+                  disabled && 'cursor-not-allowed opacity-50'
+                )}
+                title="Перетягнути"
+              >
+                <GripVertical className="h-5 w-5 text-gray-400 hover:text-gray-600 dark:text-neutral-500 dark:hover:text-neutral-300" />
+              </div>
+            </TableCell>
+          );
+        }
+        return child;
+      })}
+    </TableRow>
   );
 }

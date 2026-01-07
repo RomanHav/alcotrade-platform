@@ -15,6 +15,7 @@ import translateNewsListReducer from './slices/translateNewsListSlice';
 import translateNewsDetailReducer from './slices/translateNewsDetailSlice';
 import translateNavigationReducer from './slices/translateNavigationSlice';
 import translateFooterReducer from './slices/translateFooterSlice';
+import translateProductListReducer from './slices/translateProductListSlice';
 
 export const store = configureStore({
   reducer: {
@@ -29,6 +30,7 @@ export const store = configureStore({
     translateList: translateListReducer,
     translateDetail: translateDetailReducer,
   translateBrandList: translateBrandListReducer,
+  translateProductList: translateProductListReducer,
   translateBrandDetail: translateBrandDetailReducer,
   translateMainPage: translateMainPageReducer,
   translateNewsList: translateNewsListReducer,

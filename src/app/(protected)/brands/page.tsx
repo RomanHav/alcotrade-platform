@@ -3,12 +3,8 @@ import { auth } from '@/auth';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import BrandsTable from './_components/BrandsTable';
-import type { Prisma, BrandStatus } from '@prisma/client';
 
 export const revalidate = 0;
-
-const isStatus = (v: unknown): v is BrandStatus =>
-  v === 'ACTIVE' || v === 'DRAFT' || v === 'ARCHIVE';
 
 type SP = Record<string, string | string[] | undefined>;
 
@@ -16,35 +12,30 @@ export default async function BrandsPage({ searchParams }: { searchParams: Promi
   const session = await auth();
   if (!session?.user?.id) redirect('/sign-in?callbackUrl=/brands');
 
-  const sp = await searchParams;
-  const get = (k: keyof SP) => (Array.isArray(sp[k]) ? sp[k]![0] : sp[k]);
+  const params = await searchParams;
+  const page = Number(params.page) || 1;
+  const pageSize = 25;
 
-  const page = Math.max(1, Number(get('page') ?? '1'));
-  const pageSize = Math.min(100, Math.max(5, Number(get('pageSize') ?? '12')));
-  const q = get('query');
-  const status = get('status');
-  const sort = get('sort');
+  const query = typeof params.query === 'string' ? params.query.trim() : undefined;
+  const status = typeof params.status === 'string' ? params.status : undefined;
+  const sort = typeof params.sort === 'string' ? params.sort : undefined;
 
-  const where: Prisma.BrandWhereInput = {};
-  if (q) where.name = { contains: q, mode: 'insensitive' };
-  if (isStatus(status)) where.status = status;
-
-  let orderBy: Prisma.BrandOrderByWithRelationInput = { name: 'asc' };
-  switch (sort) {
-    case 'name_desc':
-      orderBy = { name: 'desc' };
-      break;
-    case 'status':
-      orderBy = { status: 'asc' };
-      break;
-    case 'updated':
-    case 'updated_desc':
-      orderBy = { updatedAt: 'desc' };
-      break;
+  const where: any = {};
+  if (query) {
+    where.OR = [
+      { name: { contains: query, mode: 'insensitive' } },
+      { slug: { contains: query, mode: 'insensitive' } },
+    ];
   }
+  if (status) where.status = status;
 
-  const [total, items, brandOptions] = await Promise.all([
-    prisma.brand.count({ where }),
+  let orderBy: any = { sortOrder: 'asc' };
+  if (sort === 'name_asc') orderBy = { name: 'asc' };
+  else if (sort === 'name_desc') orderBy = { name: 'desc' };
+  else if (sort === 'status') orderBy = { status: 'asc' };
+  else if (sort === 'updated') orderBy = { updatedAt: 'desc' };
+
+  const [brands, total, allBrands] = await Promise.all([
     prisma.brand.findMany({
       where,
       orderBy,
@@ -55,13 +46,13 @@ export default async function BrandsPage({ searchParams }: { searchParams: Promi
         name: true,
         slug: true,
         status: true,
-        updatedAt: true,
         cover: { select: { url: true, alt: true } },
       },
     }),
+    prisma.brand.count({ where }),
     prisma.brand.findMany({
-      select: { id: true, name: true },
       orderBy: { name: 'asc' },
+      select: { id: true, name: true },
     }),
   ]);
 
@@ -72,11 +63,11 @@ export default async function BrandsPage({ searchParams }: { searchParams: Promi
       </div>
 
       <BrandsTable
-        items={items}
+        items={brands}
         total={total}
         page={page}
         pageSize={pageSize}
-        brandOptions={brandOptions}
+        brandOptions={allBrands}
       />
     </div>
   );

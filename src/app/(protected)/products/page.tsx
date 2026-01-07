@@ -26,48 +26,32 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   const session = await auth();
   if (!session?.user?.id) redirect('/sign-in?callbackUrl=/products');
 
-  const sp = await searchParams;
-  const get = (k: keyof SP) => {
-    const v = sp[k as string];
-    return Array.isArray(v) ? v[0] : v;
-  };
+  const params = await searchParams;
+  const page = Number(params.page) || 1;
+  const pageSize = Number(params.limit) || 10;
 
-  const page = Math.max(1, Number(get('page') ?? '1'));
-  const pageSize = Math.min(100, Math.max(5, Number(get('pageSize') ?? '12')));
+  const query = typeof params.query === 'string' ? params.query.trim() : undefined;
+  const status = typeof params.status === 'string' ? params.status : undefined;
+  const brandSlug = typeof params.brand === 'string' ? params.brand : undefined;
+  const sort = typeof params.sort === 'string' ? params.sort : undefined;
 
-  const where: Prisma.ProductWhereInput = {};
-  const q = get('query');
-  const brand = get('brand');
-  const status = get('status');
-  const sort = get('sort');
-
-  if (q) where.name = { contains: q, mode: 'insensitive' };
-  if (brand) where.brand = { slug: brand };
-  if (isStatus(status)) where.status = status;
-
-  let orderBy: Prisma.ProductOrderByWithRelationInput = { name: 'asc' };
-  if (isSort(sort)) {
-    switch (sort) {
-      case 'name_desc':
-        orderBy = { name: 'desc' };
-        break;
-      case 'brand':
-        orderBy = { brand: { name: 'asc' } };
-        break;
-      case 'status':
-        orderBy = { status: 'asc' };
-        break;
-      case 'updated_desc':
-        orderBy = { updatedAt: 'desc' };
-        break;
-      case 'created_desc':
-        orderBy = { createdAt: 'desc' };
-        break;
-    }
+  const where: any = {};
+  if (query) {
+    where.OR = [
+      { name: { contains: query, mode: 'insensitive' } },
+      { slug: { contains: query, mode: 'insensitive' } },
+    ];
   }
+  if (status) where.status = status;
+  if (brandSlug) where.brand = { slug: brandSlug };
 
-  const [total, items, brands] = await Promise.all([
-    prisma.product.count({ where }),
+  let orderBy: any = { sortOrder: 'asc' };
+  if (sort === 'name_asc') orderBy = { name: 'asc' };
+  else if (sort === 'name_desc') orderBy = { name: 'desc' };
+  else if (sort === 'status') orderBy = { status: 'asc' };
+  else if (sort === 'updated') orderBy = { updatedAt: 'desc' };
+
+  const [products, total, brands] = await Promise.all([
     prisma.product.findMany({
       where,
       orderBy,
@@ -78,12 +62,15 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         name: true,
         slug: true,
         status: true,
-        updatedAt: true,
-        brand: { select: { id: true, name: true, slug: true } },
         cover: { select: { url: true, alt: true } },
+        brand: { select: { id: true, name: true, slug: true } },
       },
     }),
-    prisma.brand.findMany({ select: { id: true, name: true, slug: true } }),
+    prisma.product.count({ where }),
+    prisma.brand.findMany({
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true, slug: true },
+    }),
   ]);
 
   return (
@@ -91,7 +78,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
       <div className="mb-9 flex items-center justify-between">
         <h1 className="text-4xl font-semibold">Продукти</h1>
       </div>
-      <ProductsTable items={items} total={total} page={page} brands={brands} />
+
+      <ProductsTable items={products} total={total} page={page} brands={brands} />
     </div>
   );
 }

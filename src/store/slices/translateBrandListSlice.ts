@@ -24,29 +24,22 @@ const initialState: TranslateBrandListState = {
   total: 0,
 };
 
-const slice = createSlice({
+const translateBrandListSlice = createSlice({
   name: 'translateBrandList',
   initialState,
   reducers: {
-    setQuery: (s, a: PayloadAction<string>) => {
-      s.q = a.payload;
+    hydrateInitial(state, action: PayloadAction<{ items: TranslateBrandListItem[] }>) {
+      state.items = action.payload.items;
     },
-    setMissingOnly: (s, a: PayloadAction<boolean>) => {
-      s.missingOnly = a.payload;
+    setQuery(state, action: PayloadAction<string>) {
+      state.q = action.payload;
     },
-    setStatus: (s, a: PayloadAction<string | undefined>) => {
-      s.status = a.payload;
+    setMissingOnly(state, action: PayloadAction<boolean>) {
+      state.missingOnly = action.payload;
     },
-    hydrateInitial: (
-      s,
-      a: PayloadAction<{ items: TranslateBrandListItem[]; total?: number; page?: number; limit?: number }>,
-    ) => {
-      s.items = a.payload.items;
-      if (a.payload.total != null) s.total = a.payload.total;
-      if (a.payload.page != null) s.page = a.payload.page;
-      if (a.payload.limit != null) s.limit = a.payload.limit;
+    setStatus(state, action: PayloadAction<string | undefined>) {
+      state.status = action.payload;
     },
-    clear: () => initialState,
   },
   extraReducers: (builder) => {
     builder
@@ -66,5 +59,5 @@ const slice = createSlice({
   },
 });
 
-export const { setQuery, setMissingOnly, setStatus, hydrateInitial, clear } = slice.actions;
-export default slice.reducer;
+export const { hydrateInitial, setQuery, setMissingOnly, setStatus } = translateBrandListSlice.actions;
+export default translateBrandListSlice.reducer;

@@ -5,7 +5,7 @@ import BrandList from '@/app/(protected)/translate/brands/_components/BrandList'
 
 export default async function TranslateBrandsPage() {
   const brands = await prisma.brand.findMany({
-    orderBy: { updatedAt: 'desc' },
+    orderBy: { sortOrder: 'asc' },
     select: {
       id: true,
       name: true,
@@ -40,7 +40,7 @@ export default async function TranslateBrandsPage() {
       </div>
       <div className="flex flex-col gap-5 rounded-2xl border border-neutral-200 bg-neutral-50 p-5 shadow-sm dark:border-neutral-800 dark:bg-neutral-900">
         <h2 className="text-2xl font-medium">Бренди</h2>
-        <BrandList initial={rows as any} />
+        <BrandList initial={rows} />
       </div>
     </div>
   );
