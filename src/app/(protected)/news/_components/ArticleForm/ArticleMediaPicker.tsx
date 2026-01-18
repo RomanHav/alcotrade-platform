@@ -7,6 +7,7 @@ import { Trash2, Upload } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setFormField as setField } from '@/store/slices/articles';
 import { toast } from 'sonner';
+import imageCompression from 'browser-image-compression';
 
 export default function ArticleMediaPicker() {
   const dispatch = useAppDispatch();
@@ -24,19 +25,41 @@ export default function ArticleMediaPicker() {
 
   const pick = () => inputRef.current?.click();
 
-  const onPickFile = (files: FileList | null) => {
+  const compressFile = async (file: File): Promise<File> => {
+    if (file.size <= 1024 * 1024) return file; // Skip compression for small files
+
+    try {
+      const options = {
+        maxSizeMB: 2, // Maximum size in MB
+        maxWidthOrHeight: 1920, // Maximum width/height
+        useWebWorker: true,
+        quality: 0.8, // JPEG quality
+      };
+      const compressedFile = await imageCompression(file, options);
+      console.log(`Image compressed from ${(file.size / 1024 / 1024).toFixed(2)}MB to ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+      return compressedFile;
+    } catch (error) {
+      console.warn('Image compression failed, using original file:', error);
+      return file;
+    }
+  };
+
+  const onPickFile = async (files: FileList | null) => {
     if (!files?.length) return;
     const file = files[0];
 
+    // Compress file if needed
+    const compressedFile = await compressFile(file);
+
     // локальне превʼю
-    const blobUrl = URL.createObjectURL(file);
+    const blobUrl = URL.createObjectURL(compressedFile);
     setLocalPreview((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return blobUrl;
     });
 
     // відкладаємо аплоад до "Зберегти"
-    dispatch(setField({ key: 'pendingCoverFile', value: file as unknown as any }));
+    dispatch(setField({ key: 'pendingCoverFile', value: compressedFile as unknown as any }));
     // якщо раніше натискали "Видалити" — скасовуємо відкладене видалення
     dispatch(setField({ key: 'pendingCoverDelete', value: false }));
 

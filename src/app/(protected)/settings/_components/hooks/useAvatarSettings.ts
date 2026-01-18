@@ -1,8 +1,28 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import imageCompression from 'browser-image-compression';
 
 type AvatarDraft = { file: File | null; reset: boolean };
+
+async function compressFile(file: File): Promise<File> {
+  if (file.size <= 1024 * 1024) return file; // Skip compression for small files
+
+  try {
+    const options = {
+      maxSizeMB: 2, // Maximum size in MB
+      maxWidthOrHeight: 1920, // Maximum width/height
+      useWebWorker: true,
+      quality: 0.8, // JPEG quality
+    };
+    const compressedFile = await imageCompression(file, options);
+    console.log(`Avatar compressed from ${(file.size / 1024 / 1024).toFixed(2)}MB to ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+    return compressedFile;
+  } catch (error) {
+    console.warn('Avatar compression failed, using original file:', error);
+    return file;
+  }
+}
 
 async function getProfileImage(): Promise<string | null> {
   const r = await fetch('/api/profile', { cache: 'no-store' });
@@ -49,9 +69,11 @@ export function useAvatarSettings(defaultAvatar: string) {
 
   const dirty = draft.file !== null || draft.reset;
 
-  const onSelect = (file: File, localObjectUrl: string) => {
+  const onSelect = async (file: File, localObjectUrl: string) => {
+    // Compress file if needed
+    const compressedFile = await compressFile(file);
     setPreviewUrl(localObjectUrl);
-    setDraft({ file, reset: false });
+    setDraft({ file: compressedFile, reset: false });
   };
 
   const onReset = () => {

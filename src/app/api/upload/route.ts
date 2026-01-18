@@ -167,8 +167,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'Файл не передано' }, { status: 400 });
     }
 
-    // Check file size (allow larger files since we'll optimize them)
-    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB (will be optimized)
+    // Check file size (client should compress, but double-check)
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB (reduced since client compresses)
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json({ 
         ok: false, 

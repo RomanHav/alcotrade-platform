@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Trash2, Upload } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { clearCover, setCoverMedia } from '@/store/slices/brandFormSlice';
+import imageCompression from 'browser-image-compression';
 
 export default function BrandMediaPicker() {
   const dispatch = useAppDispatch();
@@ -16,13 +17,35 @@ export default function BrandMediaPicker() {
 
   const pick = () => inputRef.current?.click();
 
+  const compressFile = async (file: File): Promise<File> => {
+    if (file.size <= 1024 * 1024) return file; // Skip compression for small files
+
+    try {
+      const options = {
+        maxSizeMB: 2, // Maximum size in MB
+        maxWidthOrHeight: 1920, // Maximum width/height
+        useWebWorker: true,
+        quality: 0.8, // JPEG quality
+      };
+      const compressedFile = await imageCompression(file, options);
+      console.log(`Image compressed from ${(file.size / 1024 / 1024).toFixed(2)}MB to ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+      return compressedFile;
+    } catch (error) {
+      console.warn('Image compression failed, using original file:', error);
+      return file;
+    }
+  };
+
   const upload = async (files: FileList | null) => {
     if (!files?.length) return;
     setBusy(true);
     try {
       const file = files[0];
+      // Compress file if needed
+      const fileToUpload = await compressFile(file);
+
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('file', fileToUpload);
 
       const res = await fetch('/api/upload', { method: 'POST', body: fd });
       const json = await res.json();

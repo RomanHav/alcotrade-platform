@@ -33,6 +33,7 @@ import { uploadPartnerLogo, savePartnerRow } from '@/store/operations/partnersOp
 import type { Partner } from '../core/types';
 
 import { toast } from 'sonner';
+import imageCompression from 'browser-image-compression';
 
 export default function PartnersTable() {
   const dispatch = useAppDispatch();
@@ -83,9 +84,30 @@ export default function PartnersTable() {
     [dispatch],
   );
 
+  const compressFile = async (file: File): Promise<File> => {
+    if (file.size <= 1024 * 1024) return file; // Skip compression for small files
+
+    try {
+      const options = {
+        maxSizeMB: 2, // Maximum size in MB
+        maxWidthOrHeight: 1920, // Maximum width/height
+        useWebWorker: true,
+        quality: 0.8, // JPEG quality
+      };
+      const compressedFile = await imageCompression(file, options);
+      console.log(`Partner logo compressed from ${(file.size / 1024 / 1024).toFixed(2)}MB to ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+      return compressedFile;
+    } catch (error) {
+      console.warn('Partner logo compression failed, using original file:', error);
+      return file;
+    }
+  };
+
   const onUploadImage = React.useCallback(
     async (file: File, ctx: { publicId: string }) => {
-      const res = await dispatch(uploadPartnerLogo({ file, publicId: ctx.publicId })).unwrap();
+      // Compress file if needed
+      const compressedFile = await compressFile(file);
+      const res = await dispatch(uploadPartnerLogo({ file: compressedFile, publicId: ctx.publicId })).unwrap();
       return { url: res.url };
     },
     [dispatch],

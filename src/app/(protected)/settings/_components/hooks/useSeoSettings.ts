@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import imageCompression from 'browser-image-compression';
 
 type SeoState = {
   title: string;
@@ -25,6 +26,25 @@ async function getSiteSettings(): Promise<SeoState> {
     description: s?.defaultSeoDescription ?? '',
     imageUrl: s?.ogImageUrl ?? null,
   };
+}
+
+async function compressFile(file: File): Promise<File> {
+  if (file.size <= 1024 * 1024) return file; // Skip compression for small files
+
+  try {
+    const options = {
+      maxSizeMB: 2, // Maximum size in MB
+      maxWidthOrHeight: 1920, // Maximum width/height
+      useWebWorker: true,
+      quality: 0.8, // JPEG quality
+    };
+    const compressedFile = await imageCompression(file, options);
+    console.log(`SEO image compressed from ${(file.size / 1024 / 1024).toFixed(2)}MB to ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+    return compressedFile;
+  } catch (error) {
+    console.warn('SEO image compression failed, using original file:', error);
+    return file;
+  }
 }
 
 export function useSeoSettings() {
@@ -112,8 +132,10 @@ export function useSeoSettings() {
     setDraftDescription(v);
   };
 
-  const selectImage = (f: File) => {
-    setFile(f);
+  const selectImage = async (f: File) => {
+    // Compress file if needed
+    const compressedFile = await compressFile(f);
+    setFile(compressedFile);
     setRemoveOg(false);
   };
 

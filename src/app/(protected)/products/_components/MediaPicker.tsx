@@ -22,6 +22,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { addImages, removeImage, setField } from '@/store/slices/productFormSlice';
+import imageCompression from 'browser-image-compression';
 
 export default function MediaPicker() {
   const dispatch = useAppDispatch();
@@ -32,6 +33,25 @@ export default function MediaPicker() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
   const pick = () => inputRef.current?.click();
+
+  const compressFile = async (file: File): Promise<File> => {
+    if (file.size <= 1024 * 1024) return file; // Skip compression for small files
+
+    try {
+      const options = {
+        maxSizeMB: 2, // Maximum size in MB
+        maxWidthOrHeight: 1920, // Maximum width/height
+        useWebWorker: true,
+        quality: 0.8, // JPEG quality
+      };
+      const compressedFile = await imageCompression(file, options);
+      console.log(`Image compressed from ${(file.size / 1024 / 1024).toFixed(2)}MB to ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+      return compressedFile;
+    } catch (error) {
+      console.warn('Image compression failed, using original file:', error);
+      return file;
+    }
+  };
 
   const coverUrl = useMemo(() => {
     if (coverId) {
@@ -49,8 +69,11 @@ export default function MediaPicker() {
       const added: { id: string; url: string; alt?: string | null; publicId?: string | null }[] =
         [];
       for (const file of Array.from(files)) {
+        // Compress file if needed
+        const fileToUpload = await compressFile(file);
+
         const fd = new FormData();
-        fd.append('file', file);
+        fd.append('file', fileToUpload);
         const res = await fetch('/api/upload', { method: 'POST', body: fd });
         const json = await res.json();
         if (json?.ok && json?.media?.id && json?.media?.url) {
