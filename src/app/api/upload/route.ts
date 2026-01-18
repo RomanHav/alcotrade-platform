@@ -168,7 +168,7 @@ export async function POST(req: Request) {
     }
 
     // Check file size (client should compress, but double-check)
-    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB (reduced since client compresses)
+    const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB (further reduced for Vercel safety)
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json({ 
         ok: false, 

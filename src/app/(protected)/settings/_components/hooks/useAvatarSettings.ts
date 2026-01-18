@@ -6,14 +6,14 @@ import imageCompression from 'browser-image-compression';
 type AvatarDraft = { file: File | null; reset: boolean };
 
 async function compressFile(file: File): Promise<File> {
-  if (file.size <= 1024 * 1024) return file; // Skip compression for small files
+  if (file.size <= 512 * 1024) return file; // Skip compression for small files (< 512KB)
 
   try {
     const options = {
-      maxSizeMB: 2, // Maximum size in MB
-      maxWidthOrHeight: 1920, // Maximum width/height
+      maxSizeMB: 1, // Maximum size in MB - reduced for Vercel
+      maxWidthOrHeight: 1600, // Maximum width/height - reduced
       useWebWorker: true,
-      quality: 0.8, // JPEG quality
+      quality: 0.7, // JPEG quality - reduced
     };
     const compressedFile = await imageCompression(file, options);
     console.log(`Avatar compressed from ${(file.size / 1024 / 1024).toFixed(2)}MB to ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);

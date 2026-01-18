@@ -11,7 +11,7 @@ export const maxDuration = 60;
 cloudinary.config({ secure: true });
 
 const DEFAULT_AVATAR = process.env.NEXT_PUBLIC_DEFAULT_USER_IMAGE ?? '/avatar.jpg';
-const MAX_SIZE_BYTES = 5 * 1024 * 1024;
+const MAX_SIZE_BYTES = 2 * 1024 * 1024;
 
 export async function PATCH(req: NextRequest) {
   try {
