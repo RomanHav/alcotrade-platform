@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireReadToken } from '@/lib/requireReadToken';
+import { revalidateTag } from 'next/cache';
 
 export async function GET(req: Request) {
   const guard = requireReadToken(req);
@@ -46,7 +47,9 @@ export async function GET(req: Request) {
     }),
   ]);
 
-  return NextResponse.json({ items, page, limit, total });
+  return NextResponse.json({ items, page, limit, total }, {
+    headers: { 'x-next-cache-tags': 'brands' }
+  });
 }
 
 export async function DELETE(req: Request) {
@@ -117,8 +120,23 @@ export async function DELETE(req: Request) {
       await prisma.brand.deleteMany({ where: { id: { in: ids } } });
     }
 
+    // Invalidate cache
+    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/brands`, {
+      method: 'PUT',
+      headers: { 'x-api-secret': process.env.API_SECRET! }
+    }).catch(() => {}); // Ignore errors
+
     return NextResponse.json({ ok: true });
   } catch (_e) {
     return NextResponse.json({ message: 'Delete failed' }, { status: 500 });
   }
+}
+
+export async function PUT(req: Request) {
+  const authHeader = req.headers.get('x-api-secret');
+  if (authHeader !== process.env.API_SECRET) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  revalidateTag('brands');
+  return NextResponse.json({ ok: true });
 }

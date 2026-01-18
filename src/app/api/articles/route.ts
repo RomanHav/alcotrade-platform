@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
+import { revalidateTag } from 'next/cache';
 
 function parseIntSafe(v: string | null, def: number) {
   const n = Number(v);
@@ -107,7 +108,9 @@ export async function GET(req: Request) {
       translations: undefined,
     }));
 
-    return NextResponse.json({ items: itemsWithTranslation, total });
+    return NextResponse.json({ items: itemsWithTranslation, total }, {
+      headers: { 'x-next-cache-tags': 'articles' }
+    });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? 'Failed' }, { status: 500 });
   }
@@ -122,8 +125,24 @@ export async function DELETE(req: Request) {
     }
 
     const result = await prisma.article.deleteMany({ where: { id: { in: ids } } });
+
+    // Invalidate cache
+    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/articles`, {
+      method: 'PUT',
+      headers: { 'x-api-secret': process.env.API_SECRET! }
+    }).catch(() => {}); // Ignore errors
+
     return NextResponse.json({ deleted: result.count });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? 'Failed' }, { status: 500 });
   }
+}
+
+export async function PUT(req: Request) {
+  const authHeader = req.headers.get('x-api-secret');
+  if (authHeader !== process.env.API_SECRET) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  revalidateTag('articles');
+  return NextResponse.json({ ok: true });
 }

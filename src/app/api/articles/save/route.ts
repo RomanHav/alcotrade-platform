@@ -65,6 +65,13 @@ export async function POST(req: Request) {
       });
       return NextResponse.json({ id: created.id });
     }
+
+    // Invalidate cache
+    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/articles`, {
+      method: 'PUT',
+      headers: { 'x-api-secret': process.env.API_SECRET! }
+    }).catch(() => {}); // Ignore errors
+
   } catch (e: any) {
     // якщо це помилка валідації zod — 400
     if (e?.issues) {
