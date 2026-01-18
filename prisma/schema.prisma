@@ -264,7 +264,7 @@ model Article {
 
   slug   String  @unique
 
-  seoTitle       String? @db.VarChar(60)
+  seoTitle       String?
   seoDescription String? @db.VarChar(160)
 
   coverId String?

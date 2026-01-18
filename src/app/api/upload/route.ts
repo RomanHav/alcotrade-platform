@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
 import { prisma } from '@/lib/prisma';
 import { extractCloudinaryPublicId } from '@/lib/cloudinary-publicid';
+import sharp from 'sharp';
 
 export const runtime = 'nodejs';
 
@@ -47,6 +48,59 @@ const DEFAULT_FOLDERS: Record<string, string> = {
 const FALLBACK_FOLDER = 'Alcotrade/uploads';
 
 const norm = (s: string) => s.replace(/^\/+|\/+$/g, '').replace(/\/+/g, '/');
+
+async function optimizeImage(buffer: Buffer, originalSize: number): Promise<Buffer> {
+  const MAX_SIZE = 2 * 1024 * 1024; // 2MB
+  const MAX_DIMENSION = 2000; // max width/height
+
+  let sharpInstance = sharp(buffer);
+
+  // Get metadata
+  const metadata = await sharpInstance.metadata();
+
+  let needsProcessing = false;
+  let newWidth = metadata.width;
+  let newHeight = metadata.height;
+
+  // Resize if too large
+  if (metadata.width! > MAX_DIMENSION || metadata.height! > MAX_DIMENSION) {
+    needsProcessing = true;
+    if (metadata.width! > metadata.height!) {
+      newWidth = MAX_DIMENSION;
+      newHeight = Math.round((metadata.height! * MAX_DIMENSION) / metadata.width!);
+    } else {
+      newHeight = MAX_DIMENSION;
+      newWidth = Math.round((metadata.width! * MAX_DIMENSION) / metadata.height!);
+    }
+    sharpInstance = sharpInstance.resize(newWidth, newHeight, {
+      withoutEnlargement: true,
+      fit: 'inside'
+    });
+  }
+
+  // Compress if too large
+  if (originalSize > MAX_SIZE) {
+    needsProcessing = true;
+    const format = metadata.format?.toLowerCase();
+
+    if (format === 'jpeg' || format === 'jpg') {
+      sharpInstance = sharpInstance.jpeg({ quality: 80, progressive: true });
+    } else if (format === 'png') {
+      sharpInstance = sharpInstance.png({ quality: 80, compressionLevel: 6 });
+    } else if (format === 'webp') {
+      sharpInstance = sharpInstance.webp({ quality: 80 });
+    } else {
+      // Convert to JPEG for other formats
+      sharpInstance = sharpInstance.jpeg({ quality: 80, progressive: true });
+    }
+  }
+
+  if (needsProcessing) {
+    return await sharpInstance.toBuffer();
+  }
+
+  return buffer; // Return original if no processing needed
+}
 
 export async function POST(req: Request) {
   try {
@@ -113,7 +167,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'Файл не передано' }, { status: 400 });
     }
 
+    // Check file size (allow larger files since we'll optimize them)
+    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB (will be optimized)
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json({ 
+        ok: false, 
+        error: `Файл слишком большой. Максимальный размер: ${Math.round(MAX_FILE_SIZE / 1024 / 1024)}MB` 
+      }, { status: 413 });
+    }
+
     const buffer = Buffer.from(await file.arrayBuffer());
+
+    // Optimize image if needed
+    const optimizedBuffer = await optimizeImage(buffer, file.size);
 
     const uploaded = await new Promise<{
       secure_url: string;
@@ -134,7 +200,7 @@ export async function POST(req: Request) {
           format: result.format,
         });
       });
-      stream.end(buffer);
+      stream.end(optimizedBuffer);
     });
 
     const media = await prisma.mediaAsset.create({

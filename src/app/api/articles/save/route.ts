@@ -10,7 +10,7 @@ const bodySchema = z.object({
   excerpt: z.string().max(300).optional().nullable(),
   content: z.string().optional().nullable(),
   date: z.string().optional().nullable(), // ISO або null
-  seoTitle: z.string().max(60).optional().nullable(),
+  seoTitle: z.string().optional().nullable(),
   seoDescription: z.string().max(160).optional().nullable(),
   coverId: z.string().optional().nullable(),
   slug: z.string().min(1),
@@ -20,6 +20,13 @@ function parseDateISO(v?: string | null) {
   if (!v) return null;
   const d = /^\d{4}-\d{2}-\d{2}$/.test(v) ? new Date(`${v}T00:00:00`) : new Date(v);
   return Number.isNaN(d.getTime()) ? null : d;
+}
+
+function processSeoTitle(seoTitle?: string | null): string | null {
+  if (!seoTitle) return null;
+  const trimmed = seoTitle.trim();
+  if (trimmed.length <= 60) return trimmed;
+  return trimmed.substring(0, 57) + '...';
 }
 
 export async function POST(req: Request) {
@@ -45,7 +52,7 @@ export async function POST(req: Request) {
       excerpt: data.excerpt ?? null,
       content: data.content ?? null,
       date: parseDateISO(data.date),
-      seoTitle: data.seoTitle ?? null,
+      seoTitle: processSeoTitle(data.seoTitle),
       seoDescription: data.seoDescription ?? null,
       coverId: data.coverId ?? null,
       slug: data.slug,
