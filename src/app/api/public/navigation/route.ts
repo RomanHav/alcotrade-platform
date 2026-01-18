@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       items,
       locale,
-    });
+    }, { headers: { 'x-next-cache-tags': 'navigation' } });
   } catch (error) {
     console.error('Error fetching navigation:', error);
     return NextResponse.json({ error: 'Failed to fetch navigation' }, { status: 500 });

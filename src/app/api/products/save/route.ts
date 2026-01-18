@@ -161,6 +161,18 @@ export async function POST(req: Request) {
       if (writes.length) await prisma.$transaction(writes);
     }
 
+    // Invalidate cache
+    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/products`, {
+      method: 'PUT',
+      headers: { 'x-api-secret': process.env.API_SECRET! }
+    }).catch(() => {}); // Ignore errors
+
+    // Invalidate cache
+    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/products`, {
+      method: 'PUT',
+      headers: { 'x-api-secret': process.env.API_SECRET! }
+    }).catch(() => {}); // Ignore errors
+
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
     if (err instanceof Error && err.message === 'SLUG_TAKEN') {

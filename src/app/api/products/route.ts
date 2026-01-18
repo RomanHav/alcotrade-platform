@@ -2,6 +2,7 @@
 import { prisma } from '@/lib/prisma';
 import { requireReadToken } from '@/lib/requireReadToken';
 import { NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 
 export async function GET(req: Request) {
   const guard = requireReadToken(req);
@@ -48,12 +49,30 @@ export async function GET(req: Request) {
     }),
   ]);
 
-  return NextResponse.json({ items, page, limit, total });
+  return NextResponse.json({ items, page, limit, total }, {
+    headers: { 'x-next-cache-tags': 'products' }
+  });
 }
 
 export async function DELETE(req: Request) {
   const { ids } = (await req.json().catch(() => ({ ids: [] as string[] }))) as { ids?: string[] };
   if (!Array.isArray(ids) || ids.length === 0) return NextResponse.json({ ok: true });
   await prisma.product.deleteMany({ where: { id: { in: ids } } });
+
+  // Invalidate cache
+  await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/products`, {
+    method: 'PUT',
+    headers: { 'x-api-secret': process.env.API_SECRET! }
+  }).catch(() => {}); // Ignore errors
+
+  return NextResponse.json({ ok: true });
+}
+
+export async function PUT(req: Request) {
+  const authHeader = req.headers.get('x-api-secret');
+  if (authHeader !== process.env.API_SECRET) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  revalidateTag('products');
   return NextResponse.json({ ok: true });
 }

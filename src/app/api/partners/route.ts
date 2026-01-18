@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { revalidateTag } from 'next/cache';
 
 export async function GET() {
   const rows = await prisma.partner.findMany({
@@ -14,7 +15,9 @@ export async function GET() {
     image: p.logo?.url ?? null,
   }));
 
-  return NextResponse.json(data);
+  return NextResponse.json(data, {
+    headers: { 'x-next-cache-tags': 'partners' }
+  });
 }
 
 export async function POST(req: Request) {
@@ -60,6 +63,13 @@ export async function POST(req: Request) {
       },
       { status: 201 },
     );
+
+    // Invalidate cache
+    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/partners`, {
+      method: 'PUT',
+      headers: { 'x-api-secret': process.env.API_SECRET! }
+    }).catch(() => {}); // Ignore errors
+
   } catch (e: any) {
     if (e?.code === 'P2002') {
       return NextResponse.json({ error: 'Link must be unique' }, { status: 409 });
@@ -67,4 +77,13 @@ export async function POST(req: Request) {
     console.error('Create partner error:', e);
     return NextResponse.json({ error: 'Create failed' }, { status: 500 });
   }
+}
+
+export async function PUT(req: Request) {
+  const authHeader = req.headers.get('x-api-secret');
+  if (authHeader !== process.env.API_SECRET) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  revalidateTag('partners');
+  return NextResponse.json({ ok: true });
 }

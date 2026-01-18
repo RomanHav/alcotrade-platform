@@ -77,3 +77,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to update navigation' }, { status: 500 });
   }
 }
+
+    // Invalidate cache
+    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/sections`, {
+      method: 'PUT',
+      headers: { 'x-api-secret': process.env.API_SECRET! }
+    }).catch(() => {}); // Ignore errors
