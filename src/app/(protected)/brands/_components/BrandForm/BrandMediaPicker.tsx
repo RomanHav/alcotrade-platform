@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Trash2, Upload } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { clearCover, setCoverMedia } from '@/store/slices/brandFormSlice';
+import imageCompression from 'browser-image-compression';
 
 export default function BrandMediaPicker() {
   const dispatch = useAppDispatch();
@@ -16,13 +17,36 @@ export default function BrandMediaPicker() {
 
   const pick = () => inputRef.current?.click();
 
+  const compressFile = async (file: File): Promise<File> => {
+    if (file.size <= 512 * 1024) return file; // Skip compression for small files (< 512KB)
+
+    try {
+      const options = {
+        maxSizeMB: 1, // Maximum size in MB - reduced for Vercel
+        maxWidthOrHeight: 1600, // Maximum width/height - reduced
+        useWebWorker: true,
+        fileType: 'image/webp', // Convert to WebP for better compression
+        quality: 0.75, // WebP quality (slightly higher than JPEG since WebP is more efficient)
+      };
+      const compressedFile = await imageCompression(file, options);
+      console.log(`Image compressed to WebP: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+      return compressedFile;
+    } catch (error) {
+      console.warn('WebP compression failed, using original file:', error);
+      return file;
+    }
+  };
+
   const upload = async (files: FileList | null) => {
     if (!files?.length) return;
     setBusy(true);
     try {
       const file = files[0];
+      // Compress file if needed
+      const fileToUpload = await compressFile(file);
+
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('file', fileToUpload);
 
       const res = await fetch('/api/upload', { method: 'POST', body: fd });
       const json = await res.json();

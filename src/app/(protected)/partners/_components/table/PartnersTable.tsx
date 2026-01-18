@@ -33,6 +33,7 @@ import { uploadPartnerLogo, savePartnerRow } from '@/store/operations/partnersOp
 import type { Partner } from '../core/types';
 
 import { toast } from 'sonner';
+import imageCompression from 'browser-image-compression';
 
 export default function PartnersTable() {
   const dispatch = useAppDispatch();
@@ -83,9 +84,31 @@ export default function PartnersTable() {
     [dispatch],
   );
 
+  const compressFile = async (file: File): Promise<File> => {
+    if (file.size <= 512 * 1024) return file; // Skip compression for small files (< 512KB)
+
+    try {
+      const options = {
+        maxSizeMB: 1, // Maximum size in MB - reduced for Vercel
+        maxWidthOrHeight: 1600, // Maximum width/height - reduced
+        useWebWorker: true,
+        fileType: 'image/webp', // Convert to WebP for better compression
+        quality: 0.75, // WebP quality (slightly higher than JPEG since WebP is more efficient)
+      };
+      const compressedFile = await imageCompression(file, options);
+      console.log(`Partner logo compressed to WebP: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+      return compressedFile;
+    } catch (error) {
+      console.warn('Partner logo WebP compression failed, using original file:', error);
+      return file;
+    }
+  };
+
   const onUploadImage = React.useCallback(
     async (file: File, ctx: { publicId: string }) => {
-      const res = await dispatch(uploadPartnerLogo({ file, publicId: ctx.publicId })).unwrap();
+      // Compress file if needed
+      const compressedFile = await compressFile(file);
+      const res = await dispatch(uploadPartnerLogo({ file: compressedFile, publicId: ctx.publicId })).unwrap();
       return { url: res.url };
     },
     [dispatch],

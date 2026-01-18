@@ -1,8 +1,29 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import imageCompression from 'browser-image-compression';
 
 type AvatarDraft = { file: File | null; reset: boolean };
+
+async function compressFile(file: File): Promise<File> {
+  if (file.size <= 512 * 1024) return file; // Skip compression for small files (< 512KB)
+
+  try {
+    const options = {
+      maxSizeMB: 1, // Maximum size in MB - reduced for Vercel
+      maxWidthOrHeight: 1600, // Maximum width/height - reduced
+      useWebWorker: true,
+      fileType: 'image/webp', // Convert to WebP for better compression
+      quality: 0.75, // WebP quality (slightly higher than JPEG since WebP is more efficient)
+    };
+    const compressedFile = await imageCompression(file, options);
+    console.log(`Avatar compressed to WebP: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+    return compressedFile;
+  } catch (error) {
+    console.warn('Avatar WebP compression failed, using original file:', error);
+    return file;
+  }
+}
 
 async function getProfileImage(): Promise<string | null> {
   const r = await fetch('/api/profile', { cache: 'no-store' });
@@ -49,9 +70,11 @@ export function useAvatarSettings(defaultAvatar: string) {
 
   const dirty = draft.file !== null || draft.reset;
 
-  const onSelect = (file: File, localObjectUrl: string) => {
+  const onSelect = async (file: File, localObjectUrl: string) => {
+    // Compress file if needed
+    const compressedFile = await compressFile(file);
     setPreviewUrl(localObjectUrl);
-    setDraft({ file, reset: false });
+    setDraft({ file: compressedFile, reset: false });
   };
 
   const onReset = () => {

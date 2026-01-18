@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import imageCompression from 'browser-image-compression';
 
 type SeoState = {
   title: string;
@@ -25,6 +26,26 @@ async function getSiteSettings(): Promise<SeoState> {
     description: s?.defaultSeoDescription ?? '',
     imageUrl: s?.ogImageUrl ?? null,
   };
+}
+
+async function compressFile(file: File): Promise<File> {
+  if (file.size <= 512 * 1024) return file; // Skip compression for small files (< 512KB)
+
+  try {
+    const options = {
+      maxSizeMB: 1, // Maximum size in MB - reduced for Vercel
+      maxWidthOrHeight: 1600, // Maximum width/height - reduced
+      useWebWorker: true,
+      fileType: 'image/webp', // Convert to WebP for better compression
+      quality: 0.75, // WebP quality (slightly higher than JPEG since WebP is more efficient)
+    };
+    const compressedFile = await imageCompression(file, options);
+    console.log(`SEO image compressed to WebP: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+    return compressedFile;
+  } catch (error) {
+    console.warn('SEO image WebP compression failed, using original file:', error);
+    return file;
+  }
 }
 
 export function useSeoSettings() {
@@ -112,8 +133,10 @@ export function useSeoSettings() {
     setDraftDescription(v);
   };
 
-  const selectImage = (f: File) => {
-    setFile(f);
+  const selectImage = async (f: File) => {
+    // Compress file if needed
+    const compressedFile = await compressFile(f);
+    setFile(compressedFile);
     setRemoveOg(false);
   };
 

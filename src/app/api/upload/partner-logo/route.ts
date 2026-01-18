@@ -47,6 +47,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'file is required' }, { status: 400 });
     }
 
+    // Check file size (client should compress, but double-check)
+    const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB (for Vercel safety)
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json({ 
+        error: `Файл слишком большой. Максимальный размер: ${Math.round(MAX_FILE_SIZE / 1024 / 1024)}MB` 
+      }, { status: 413 });
+    }
+
     const { folder, name } = splitPublicId(publicIdRaw);
 
     const arrayBuffer = await file.arrayBuffer();

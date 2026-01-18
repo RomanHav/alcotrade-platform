@@ -7,6 +7,7 @@ import { Trash2, Upload } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import { setFormField as setField } from '@/store/slices/articles';
 import { toast } from 'sonner';
+import imageCompression from 'browser-image-compression';
 
 export default function ArticleMediaPicker() {
   const dispatch = useAppDispatch();
@@ -24,19 +25,42 @@ export default function ArticleMediaPicker() {
 
   const pick = () => inputRef.current?.click();
 
-  const onPickFile = (files: FileList | null) => {
+  const compressFile = async (file: File): Promise<File> => {
+    if (file.size <= 512 * 1024) return file; // Skip compression for small files (< 512KB)
+
+    try {
+      const options = {
+        maxSizeMB: 1, // Maximum size in MB - reduced for Vercel
+        maxWidthOrHeight: 1600, // Maximum width/height - reduced
+        useWebWorker: true,
+        fileType: 'image/webp', // Convert to WebP for better compression
+        quality: 0.75, // WebP quality (slightly higher than JPEG since WebP is more efficient)
+      };
+      const compressedFile = await imageCompression(file, options);
+      console.log(`Image compressed to WebP: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+      return compressedFile;
+    } catch (error) {
+      console.warn('WebP compression failed, using original file:', error);
+      return file;
+    }
+  };
+
+  const onPickFile = async (files: FileList | null) => {
     if (!files?.length) return;
     const file = files[0];
 
+    // Compress file if needed
+    const compressedFile = await compressFile(file);
+
     // локальне превʼю
-    const blobUrl = URL.createObjectURL(file);
+    const blobUrl = URL.createObjectURL(compressedFile);
     setLocalPreview((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return blobUrl;
     });
 
     // відкладаємо аплоад до "Зберегти"
-    dispatch(setField({ key: 'pendingCoverFile', value: file as unknown as any }));
+    dispatch(setField({ key: 'pendingCoverFile', value: compressedFile as unknown as any }));
     // якщо раніше натискали "Видалити" — скасовуємо відкладене видалення
     dispatch(setField({ key: 'pendingCoverDelete', value: false }));
 

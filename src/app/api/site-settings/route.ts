@@ -29,7 +29,7 @@ const DEFAULT_ID = envIntRequired('SITE_SETTINGS_DEFAULT_ID');
 const MAX_TITLE = envIntRequired('SEO_MAX_TITLE');
 const MAX_DESC = envIntRequired('SEO_MAX_DESC');
 const MAX_SUFFIX = envIntRequired('SEO_MAX_SUFFIX');
-const MAX_SIZE_BYTES = 10 * 1024 * 1024;
+const MAX_SIZE_BYTES = 2 * 1024 * 1024;
 
 const TITLE_SUFFIX_DEFAULT = envRequired('SEO_TITLE_SUFFIX_DEFAULT');
 
