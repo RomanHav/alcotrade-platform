@@ -98,22 +98,96 @@ function applyQuote(text: string, start: number, end: number) {
 function applyCode(text: string, start: number, end: number) {
   const sel = text.slice(start, end);
   const isMulti = sel.includes("\n");
+
   if (isMulti) {
+    // Check if already in code block
+    const before = text.slice(Math.max(0, start - 4), start);
+    const after = text.slice(end, Math.min(text.length, end + 4));
+
+    if (before === '```\n' && after === '\n```') {
+      return text.slice(0, start - 4) + sel + text.slice(end + 4);
+    }
+
     return surround(text, start, end, "```\n", "\n```\n");
   }
+
+  // Check if already in inline code
+  const before = text.slice(Math.max(0, start - 1), start);
+  const after = text.slice(end, Math.min(text.length, end + 1));
+
+  if (before === '`' && after === '`') {
+    return text.slice(0, start - 1) + sel + text.slice(end + 1);
+  }
+
+  // If selection starts/ends with `, remove them
+  if (sel.startsWith('`') && sel.endsWith('`') && sel.length > 2) {
+    const inner = sel.slice(1, -1);
+    return text.slice(0, start) + inner + text.slice(end);
+  }
+
   return surround(text, start, end, "`", "`");
 }
 
 function applyStrong(text: string, start: number, end: number) {
+  // Check if the selection is already wrapped in ** markers
+  const before = text.slice(Math.max(0, start - 2), start);
+  const after = text.slice(end, Math.min(text.length, end + 2));
+  const sel = text.slice(start, end);
+
+  // If selection is already bold, remove the markers
+  if (before === '**' && after === '**') {
+    return text.slice(0, start - 2) + sel + text.slice(end + 2);
+  }
+
+  // If selection starts/ends with **, remove them and don't add new ones
+  if (sel.startsWith('**') && sel.endsWith('**')) {
+    const inner = sel.slice(2, -2);
+    return text.slice(0, start) + inner + text.slice(end);
+  }
+
+  // Otherwise, add bold markers
   return surround(text, start, end, "**", "**");
 }
 
 function applyEm(text: string, start: number, end: number) {
+  // Check if the selection is already wrapped in * markers
+  const before = text.slice(Math.max(0, start - 1), start);
+  const after = text.slice(end, Math.min(text.length, end + 1));
+  const sel = text.slice(start, end);
+
+  // If selection is already italic, remove the markers
+  if (before === '*' && after === '*') {
+    return text.slice(0, start - 1) + sel + text.slice(end + 1);
+  }
+
+  // If selection starts/ends with *, remove them and don't add new ones
+  if (sel.startsWith('*') && sel.endsWith('*') && sel.length > 2) {
+    const inner = sel.slice(1, -1);
+    return text.slice(0, start) + inner + text.slice(end);
+  }
+
+  // Otherwise, add italic markers
   return surround(text, start, end, "*", "*");
 }
 
 function applyUnderline(text: string, start: number, end: number) {
-  // Подчёркивание в Markdown отсутствует — используем двойное подчёркивание как альтернативный стиль (похоже на bold)
+  // Check if the selection is already wrapped in __ markers
+  const before = text.slice(Math.max(0, start - 2), start);
+  const after = text.slice(end, Math.min(text.length, end + 2));
+  const sel = text.slice(start, end);
+
+  // If selection is already underlined, remove the markers
+  if (before === '__' && after === '__') {
+    return text.slice(0, start - 2) + sel + text.slice(end + 2);
+  }
+
+  // If selection starts/ends with __, remove them and don't add new ones
+  if (sel.startsWith('__') && sel.endsWith('__')) {
+    const inner = sel.slice(2, -2);
+    return text.slice(0, start) + inner + text.slice(end);
+  }
+
+  // Otherwise, add underline markers
   return surround(text, start, end, "__", "__");
 }
 
@@ -192,6 +266,68 @@ export const RichTextarea = forwardRef<HTMLTextAreaElement, RichTextareaProps>(
       [value, onChange],
     );
 
+    const handleKeyDown = useCallback(
+      (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        // Handle Enter key for paragraphs
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          const el = areaRef.current;
+          if (!el) return;
+
+          const start = el.selectionStart;
+          const end = el.selectionEnd;
+          const text = value;
+
+          // Check if we're at the end of the text or there's selected text
+          if (start === end) {
+            // Simple Enter - add a new line
+            const before = text.slice(0, start);
+            const after = text.slice(start);
+            const newText = before + '\n' + after;
+            onChange(newText);
+
+            requestAnimationFrame(() => {
+              el.setSelectionRange(start + 1, start + 1);
+            });
+          } else {
+            // Text is selected - replace with new line
+            const before = text.slice(0, start);
+            const after = text.slice(end);
+            const newText = before + '\n' + after;
+            onChange(newText);
+
+            requestAnimationFrame(() => {
+              el.setSelectionRange(start + 1, start + 1);
+            });
+          }
+          return;
+        }
+
+        // Handle keyboard shortcuts
+        if (e.ctrlKey || e.metaKey) {
+          switch (e.key.toLowerCase()) {
+            case 'b':
+              e.preventDefault();
+              runEdit(applyStrong);
+              break;
+            case 'i':
+              e.preventDefault();
+              runEdit(applyEm);
+              break;
+            case 'u':
+              e.preventDefault();
+              runEdit(applyUnderline);
+              break;
+            case '`':
+              e.preventDefault();
+              runEdit(applyCode);
+              break;
+          }
+        }
+      },
+      [value, onChange, runEdit],
+    );
+
     const toolbar = useMemo(() => (
       <div className={cn("flex flex-wrap items-center gap-1 border-b p-1", toolbarClassName)}>
         <div className="flex items-center gap-1">
@@ -250,7 +386,7 @@ export const RichTextarea = forwardRef<HTMLTextAreaElement, RichTextareaProps>(
     return (
       <div className={cn("rounded-md border bg-neutral-200 dark:bg-neutral-800", wrapperClassName)}>
         {toolbar}
-        <Textarea ref={bindRef} className={cn("border-0 shadow-none focus-visible:ring-0", className)} value={value} onChange={(e) => onChange(e.target.value)} {...props} />
+        <Textarea ref={bindRef} className={cn("border-0 shadow-none focus-visible:ring-0", className)} value={value} onChange={(e) => onChange(e.target.value)} onKeyDown={handleKeyDown} {...props} />
       </div>
     );
   },
