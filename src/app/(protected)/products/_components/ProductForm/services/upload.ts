@@ -9,12 +9,13 @@ export async function uploadOne(file: File) {
         maxSizeMB: 1, // Maximum size in MB - reduced for Vercel
         maxWidthOrHeight: 1600, // Maximum width/height - reduced
         useWebWorker: true,
-        quality: 0.7, // JPEG quality - reduced
+        fileType: 'image/webp', // Convert to WebP for better compression
+        quality: 0.75, // WebP quality (slightly higher than JPEG since WebP is more efficient)
       };
       fileToUpload = await imageCompression(file, options);
-      console.log(`Image compressed from ${(file.size / 1024 / 1024).toFixed(2)}MB to ${(fileToUpload.size / 1024 / 1024).toFixed(2)}MB`);
+      console.log(`Image compressed to WebP: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(fileToUpload.size / 1024 / 1024).toFixed(2)}MB`);
     } catch (error) {
-      console.warn('Image compression failed, uploading original file:', error);
+      console.warn('Image WebP compression failed, uploading original file:', error);
       // Continue with original file if compression fails
     }
   }

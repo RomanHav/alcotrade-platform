@@ -13,13 +13,14 @@ async function compressFile(file: File): Promise<File> {
       maxSizeMB: 1, // Maximum size in MB - reduced for Vercel
       maxWidthOrHeight: 1600, // Maximum width/height - reduced
       useWebWorker: true,
-      quality: 0.7, // JPEG quality - reduced
+      fileType: 'image/webp', // Convert to WebP for better compression
+      quality: 0.75, // WebP quality (slightly higher than JPEG since WebP is more efficient)
     };
     const compressedFile = await imageCompression(file, options);
-    console.log(`Avatar compressed from ${(file.size / 1024 / 1024).toFixed(2)}MB to ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
+    console.log(`Avatar compressed to WebP: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(compressedFile.size / 1024 / 1024).toFixed(2)}MB`);
     return compressedFile;
   } catch (error) {
-    console.warn('Avatar compression failed, using original file:', error);
+    console.warn('Avatar WebP compression failed, using original file:', error);
     return file;
   }
 }
