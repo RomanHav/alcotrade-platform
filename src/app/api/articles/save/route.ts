@@ -74,9 +74,13 @@ export async function POST(req: Request) {
     }
 
     // Invalidate cache
-    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/articles`, {
-      method: 'PUT',
-      headers: { 'x-api-secret': process.env.API_SECRET! }
+    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/revalidate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-secret': process.env.API_SECRET!
+      },
+      body: JSON.stringify({ tags: ['articles'] })
     }).catch(() => {}); // Ignore errors
 
   } catch (e: any) {

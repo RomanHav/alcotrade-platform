@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { revalidateTag } from 'next/cache';
 
 export async function GET() {
   const rows = await prisma.partner.findMany({
@@ -65,9 +64,13 @@ export async function POST(req: Request) {
     );
 
     // Invalidate cache
-    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/partners`, {
-      method: 'PUT',
-      headers: { 'x-api-secret': process.env.API_SECRET! }
+    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/revalidate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-secret': process.env.API_SECRET!
+      },
+      body: JSON.stringify({ tags: ['partners'] })
     }).catch(() => {}); // Ignore errors
 
   } catch (e: any) {
@@ -77,13 +80,4 @@ export async function POST(req: Request) {
     console.error('Create partner error:', e);
     return NextResponse.json({ error: 'Create failed' }, { status: 500 });
   }
-}
-
-export async function PUT(req: Request) {
-  const authHeader = req.headers.get('x-api-secret');
-  if (authHeader !== process.env.API_SECRET) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  revalidateTag('partners');
-  return NextResponse.json({ ok: true });
 }

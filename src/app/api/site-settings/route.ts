@@ -3,7 +3,6 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import type { Prisma } from '@prisma/client';
 import { v2 as cloudinary } from 'cloudinary';
-import { revalidateTag } from 'next/cache';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -233,22 +232,17 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: true, settings: updated }, { status: 200 });
 
     // Invalidate cache
-    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/site-settings`, {
-      method: 'PUT',
-      headers: { 'x-api-secret': process.env.API_SECRET! }
+    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/revalidate`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-secret': process.env.API_SECRET!
+      },
+      body: JSON.stringify({ tags: ['site-settings'] })
     }).catch(() => {}); // Ignore errors
 
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Помилка оновлення';
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });
   }
-}
-
-export async function PUT(req: Request) {
-  const authHeader = req.headers.get('x-api-secret');
-  if (authHeader !== process.env.API_SECRET) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  revalidateTag('site-settings');
-  return NextResponse.json({ ok: true });
 }
