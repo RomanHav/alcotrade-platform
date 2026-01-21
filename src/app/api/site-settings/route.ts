@@ -1,6 +1,7 @@
 // src/app/api/site-settings/route.ts
 import { NextResponse, type NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { revalidateCache } from '@/lib/revalidate';
 import type { Prisma } from '@prisma/client';
 import { v2 as cloudinary } from 'cloudinary';
 
@@ -232,14 +233,7 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: true, settings: updated }, { status: 200 });
 
     // Invalidate cache
-    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/revalidate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-secret': process.env.API_SECRET!
-      },
-      body: JSON.stringify({ tags: ['site-settings'] })
-    }).catch(() => {}); // Ignore errors
+    await revalidateCache(['site-settings'], 'site-settings');
 
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Помилка оновлення';

@@ -1,6 +1,7 @@
 // src/app/api/translate/navigation/route.ts
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { revalidateCache } from '@/lib/revalidate';
 
 export async function GET() {
   try {
@@ -79,11 +80,4 @@ export async function POST(request: Request) {
 }
 
     // Invalidate cache
-    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/revalidate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-secret': process.env.API_SECRET!
-      },
-      body: JSON.stringify({ tags: ['navigation'] })
-    }).catch(() => {}); // Ignore errors
+    await revalidateCache(['navigation'], 'navigation');

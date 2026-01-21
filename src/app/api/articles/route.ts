@@ -1,6 +1,7 @@
 // app/api/articles/route.ts
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { revalidateCache } from '@/lib/revalidate';
 import type { Prisma } from '@prisma/client';
 
 function parseIntSafe(v: string | null, def: number) {
@@ -44,6 +45,8 @@ function sortToOrderBy(sort?: string): Prisma.ArticleOrderByWithRelationInput[] 
 
 export async function GET(req: Request) {
   try {
+    console.log('GET /api/articles called');
+
     const { searchParams } = new URL(req.url);
     const page = parseIntSafe(searchParams.get('page'), 1);
     const pageSize = Math.min(100, parseIntSafe(searchParams.get('pageSize'), 10));
@@ -126,14 +129,7 @@ export async function DELETE(req: Request) {
     const result = await prisma.article.deleteMany({ where: { id: { in: ids } } });
 
     // Invalidate cache
-    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/revalidate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-secret': process.env.API_SECRET!
-      },
-      body: JSON.stringify({ tags: ['articles'] })
-    }).catch(() => {}); // Ignore errors
+    await revalidateCache(['articles'], 'articles');
 
     return NextResponse.json({ deleted: result.count });
   } catch (e: any) {

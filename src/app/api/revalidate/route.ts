@@ -20,11 +20,14 @@ import { revalidateTag } from 'next/cache';
 
 export async function POST(req: NextRequest) {
   try {
+    console.log('Revalidate endpoint called');
+
     // Проверяем API секрет
     const authHeader = req.headers.get('x-api-secret');
     const apiSecret = process.env.API_SECRET;
 
     if (!authHeader || !apiSecret || authHeader !== apiSecret) {
+      console.log('Revalidate: Unauthorized access attempt');
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
