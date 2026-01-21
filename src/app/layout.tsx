@@ -13,7 +13,7 @@ const geologica = Geologica({
 
 export const metadata: Metadata = {
   title: 'AlcoTrade Platform',
-  description: 'Control panel for AlcoTrade e-commerce platform',
+  description: '',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
