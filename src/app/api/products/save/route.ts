@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { NextResponse } from 'next/server';
+import { revalidateCache } from '@/lib/revalidate';
 import { ProductStatus, Prisma } from '@prisma/client';
 import { slug as makeSlug } from '@/lib/slug';
 
@@ -162,14 +163,7 @@ export async function POST(req: Request) {
     }
 
     // Invalidate cache
-    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/revalidate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-secret': process.env.API_SECRET!
-      },
-      body: JSON.stringify({ tags: ['products'] })
-    }).catch(() => {}); // Ignore errors
+    await revalidateCache(['products'], 'products');
 
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {

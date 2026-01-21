@@ -1,6 +1,7 @@
 // app/api/articles/save/route.ts
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { revalidateCache } from '@/lib/revalidate';
 import { z } from 'zod';
 
 const bodySchema = z.object({
@@ -74,14 +75,7 @@ export async function POST(req: Request) {
     }
 
     // Invalidate cache
-    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/revalidate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-secret': process.env.API_SECRET!
-      },
-      body: JSON.stringify({ tags: ['articles'] })
-    }).catch(() => {}); // Ignore errors
+    await revalidateCache(['articles'], 'articles');
 
   } catch (e: any) {
     // якщо це помилка валідації zod — 400

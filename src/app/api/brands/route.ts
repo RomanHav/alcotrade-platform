@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireReadToken } from '@/lib/requireReadToken';
+import { revalidateCache } from '@/lib/revalidate';
 
 export async function GET(req: Request) {
   const guard = requireReadToken(req);
@@ -120,14 +121,7 @@ export async function DELETE(req: Request) {
     }
 
     // Invalidate cache
-    await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/revalidate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-secret': process.env.API_SECRET!
-      },
-      body: JSON.stringify({ tags: ['brands'] })
-    }).catch(() => {}); // Ignore errors
+    await revalidateCache(['brands'], 'brands');
 
     return NextResponse.json({ ok: true });
   } catch (_e) {
