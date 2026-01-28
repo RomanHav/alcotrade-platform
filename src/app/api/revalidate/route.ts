@@ -55,7 +55,8 @@ export async function POST(req: NextRequest) {
       'navigation',
       'site-settings',
       'footer',
-      'main-page'
+      'main-page',
+      'sort-order'
     ];
 
     const invalidTags = tags.filter(tag => !validTags.includes(tag));
