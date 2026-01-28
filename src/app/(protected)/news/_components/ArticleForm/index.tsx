@@ -136,6 +136,10 @@ export default function ArticleForm({
           ? new Date(`${data.date}T00:00:00`).toISOString()
           : data.date || null;
 
+      // Формуємо SEO поля з обов'язковим обрізанням до дозволеної довжини
+      const seoTitleValue = ((data.seoTitle && data.seoTitle.trim()) || (data.title?.trim() ?? '')).slice(0, 60);
+      const seoDescriptionValue = ((data.seoDescription && data.seoDescription.trim()) || (data.content ?? '').slice(0, 160)).slice(0, 160);
+
       const parsed = schema.parse({
         id: data.id || undefined,
         title: data.title ?? '',
@@ -144,11 +148,8 @@ export default function ArticleForm({
         excerpt: (data.content ?? '').slice(0, 300),
         content: data.content ?? '',
         date: dateISO,
-        seoTitle: (data.seoTitle && data.seoTitle.trim()) || (data.title ?? null),
-        seoDescription:
-        (data.seoDescription && data.seoDescription.trim()) ||
-        (data.content ?? '').slice(0, 160) ||
-        null,
+        seoTitle: seoTitleValue || null,
+        seoDescription: seoDescriptionValue || null,
         coverId: data.coverId ?? null,
         slug: makeSlug(slug || data.title || ''),
       });
