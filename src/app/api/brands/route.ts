@@ -31,7 +31,7 @@ export async function GET(req: Request) {
     prisma.brand.count({ where: { status: 'ACTIVE' } }),
     prisma.brand.findMany({
       where,
-      orderBy: { name: 'asc' },
+      orderBy: { sortOrder: 'asc' }, // ← ИЗМЕНО
       skip: (page - 1) * limit,
       take: limit,
       select: {
@@ -42,6 +42,7 @@ export async function GET(req: Request) {
         seoTitle: true,
         seoDescription: true,
         cover: { select: { url: true, width: true, height: true, alt: true } },
+        sortOrder: true, // ← ДОБАВЛЕНО
         _count: { select: { products: { where: { status: 'ACTIVE' } } } },
       },
     }),
