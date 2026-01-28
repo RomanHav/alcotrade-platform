@@ -34,7 +34,7 @@ export async function GET(req: Request) {
     prisma.product.count({ where }),
     prisma.product.findMany({
       where,
-      orderBy: [{ createdAt: 'desc' }, { name: 'asc' }],
+      orderBy: { sortOrder: 'asc' }, // ← ИЗМЕНО (было [{ createdAt: 'desc' }, { name: 'asc' }])
       skip: (page - 1) * limit,
       take: limit,
       select: {
@@ -43,6 +43,7 @@ export async function GET(req: Request) {
         slug: true,
         brand: { select: { id: true, name: true, slug: true } },
         cover: { select: { url: true, width: true, height: true, alt: true } },
+        sortOrder: true, // ← ДОБАВЛЕНО
         translations: { where: { locale: 'en' }, select: { id: true, locale: true, name: true, slug: true, seoTitle: true, seoDescription: true } },
         variants: { select: { id: true, label: true, volumeMl: true, position: true } },
       },
