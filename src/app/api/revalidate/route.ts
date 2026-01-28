@@ -1,20 +1,3 @@
-/**
- * Универсальный endpoint для revalidation
- * Используется для очистки кэша при обновлении данных в CMS
- *
- * Пример использования в CMS:
- * await fetch('/api/revalidate', {
- *   method: 'POST',
- *   headers: {
- *     'Content-Type': 'application/json',
- *     'x-api-secret': process.env.API_SECRET,
- *   },
- *   body: JSON.stringify({
- *     tags: ['articles', 'products', 'brands', 'sections']
- *   })
- * })
- */
-
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
 

@@ -3,8 +3,9 @@ import { prisma } from '@/lib/prisma';
 
 async function triggerRevalidate() {
   try {
-    const revalidateUrl = `${process.env.AUTH_URL || 'http://localhost:3000'}/api/revalidate`;
-    await fetch(revalidateUrl, {
+    const revalidateUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/revalidate`;
+    
+    const response = await fetch(revalidateUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -14,6 +15,13 @@ async function triggerRevalidate() {
         tags: ['sort-order', 'products'],
       }),
     });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Revalidate failed:', response.status, errorText);
+    } else {
+      console.log('✅ Revalidate successful for products');
+    }
   } catch (error) {
     console.error('Failed to trigger revalidate:', error);
   }
@@ -37,7 +45,8 @@ export async function POST(req: NextRequest) {
     await prisma.$transaction(updates);
 
     // Trigger revalidate after successful update
-    void triggerRevalidate();
+    console.log('[Product Reorder] Updated, triggering revalidate...');
+    await triggerRevalidate();
 
     return NextResponse.json({ success: true });
   } catch (error) {
