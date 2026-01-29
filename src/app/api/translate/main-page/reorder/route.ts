@@ -12,6 +12,8 @@ export async function GET() {
         key: true,
         position: true,
         isVisible: true,
+        videoUrl: true,
+        videoPublicId: true,
       },
     });
 

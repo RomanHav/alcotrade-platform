@@ -5,13 +5,23 @@ import { prisma } from '@/lib/prisma';
 export async function GET() {
   try {
     const sections = await prisma.mainPageSection.findMany({
+  orderBy: { position: 'asc' },
+  select: {
+    id: true,
+    key: true,
+    position: true,
+    videoUrl: true,
+    videoPublicId: true,
+    items: {
       orderBy: { position: 'asc' },
-      include: {
-        items: {
-          orderBy: { position: 'asc' },
-        },
+      select: {
+        id: true,
+        key: true,
+        position: true,
       },
-    });
+    },
+  },
+});
 
     return NextResponse.json({ sections });
   } catch (error) {
