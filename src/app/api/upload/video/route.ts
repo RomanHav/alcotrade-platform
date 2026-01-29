@@ -26,7 +26,7 @@ function ensureCloudinaryCreds() {
 }
 
 const VIDEO_FOLDER = 'Alcotrade/videos';
-const MAX_VIDEO_SIZE = 100 * 1024 * 1024; // 100MB for videos
+const MAX_VIDEO_SIZE = 150 * 1024 * 1024; // 100MB for videos
 
 export async function POST(req: Request) {
   try {
