@@ -362,6 +362,11 @@ model MainPageSection {
   key         String   @unique // e.g. "hero", "about", "brands", "capabilities", "partners"
   position    Int      @default(0)
   isVisible   Boolean  @default(true)
+  
+  // Video support
+  videoUrl    String?  // URL to video stored in Cloudinary
+  videoPublicId String? // Cloudinary public_id for deletion
+  
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

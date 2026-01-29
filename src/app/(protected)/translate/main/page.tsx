@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { prisma } from '@/lib/prisma';
 import MainPageSectionList from './_components/MainPageSectionList';
-import View from '../_components/View';
+import MainPageVideoManager from './_components/MainPageVideoManager';
+// import View from '../_components/View';
 
 // Human-readable section names
 const sectionNames: Record<string, string> = {
@@ -36,6 +37,8 @@ export default async function TranslateMainPage() {
     itemsCount: s.items.length,
     hasAllEnTranslations: s.items.every((i) => i.valueEn && i.valueEn.trim().length > 0),
     updatedAt: s.updatedAt.toISOString(),
+    videoUrl: s.videoUrl,
+    videoPublicId: s.videoPublicId,
   }));
 
   // Data for View component (section ordering)
@@ -64,7 +67,10 @@ export default async function TranslateMainPage() {
           <h2 className="text-2xl font-medium">Секції головної</h2>
           <MainPageSectionList initial={sectionsWithNames} />
         </div>
-        <View sections={viewSections} />
+        <div className="flex w-2/5 flex-col gap-5">
+          {/* <View sections={viewSections} /> */}
+          <MainPageVideoManager sections={sections} />
+        </div>
       </div>
     </div>
   );
