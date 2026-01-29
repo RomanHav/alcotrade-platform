@@ -34,11 +34,18 @@ export async function GET(request: NextRequest) {
         items[item.key] = value;
       });
 
-      return {
+      const sectionData: Record<string, any> = {
         key: section.key,
         position: section.position,
         items,
       };
+
+      // Include video URL for hero and partners sections
+      if (section.videoUrl && ['hero', 'partners'].includes(section.key)) {
+        sectionData.videoUrl = section.videoUrl;
+      }
+
+      return sectionData;
     });
 
     return NextResponse.json({
