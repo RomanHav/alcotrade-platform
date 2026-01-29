@@ -24,6 +24,7 @@ export default function VideoUpload({
   disabled = false,
   muted = false,
 }: VideoUploadProps) {
+  const [progress, setProgress] = useState<number>(0);
   const [uploading, setUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -55,50 +56,80 @@ export default function VideoUpload({
   };
 
   const handleFile = async (file: File) => {
-    if (!file.type.startsWith('video/')) {
-      toast.error('Потрібне відео');
-      return;
-    }
+  if (!file.type.startsWith('video/')) {
+    toast.error('Потрібне відео');
+    return;
+  }
 
-    if (file.size > 100 * 1024 * 1024) {
-      toast.error('Файл завеликий (макс 100MB)');
-      return;
-    }
+  if (file.size > 100 * 1024 * 1024) {
+    toast.error('Файл завеликий (макс 100MB)');
+    return;
+  }
 
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('sectionId', sectionId);
+  setUploading(true);
 
-      const response = await fetch('/api/upload/video', {
-        method: 'POST',
-        body: formData,
-      });
+  try {
+    const signRes = await fetch('/api/cloudinary/sign', { method: 'POST' });
+    if (!signRes.ok) throw new Error('Не вдалося отримати підпис');
 
-      const data = await response.json();
+    const { signature, timestamp, cloudName, apiKey, folder } =
+      await signRes.json();
 
-      if (!response.ok || !data.ok) {
-        throw new Error(data.error || 'Помилка завантаження');
+    const uploadResult = await new Promise<any>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+
+    xhr.open(
+      'POST',
+      `https://api.cloudinary.com/v1_1/${cloudName}/video/upload`
+    );
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percent = Math.round((event.loaded / event.total) * 100);
+        setProgress(percent);
       }
+    };
 
-      onUploadComplete({
-        url: data.video.url,
-        publicId: data.video.publicId,
-        duration: data.video.duration,
-      });
-
-      toast.success('Відео завантажено');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Помилка завантаження';
-      toast.error(message);
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(JSON.parse(xhr.responseText));
+      } else {
+        reject(new Error('Помилка завантаження у Cloudinary'));
       }
+    };
+
+    xhr.onerror = () => reject(new Error('Помилка мережі'));
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('api_key', apiKey);
+    formData.append('timestamp', timestamp.toString());
+    formData.append('signature', signature);
+    formData.append('folder', folder);
+
+    xhr.send(formData);
+});
+
+    onUploadComplete({
+    url: uploadResult.secure_url,
+    publicId: uploadResult.public_id,
+    duration: uploadResult.duration,
+});
+
+    setProgress(0);
+
+    toast.success('Відео завантажено');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Помилка завантаження';
+    toast.error(message);
+  } finally {
+    setUploading(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
-  };
+  }
+};
+
 
   const handleDelete = async () => {
     if (!currentVideoPublicId) return;
@@ -173,12 +204,12 @@ export default function VideoUpload({
           />
           <div className="flex flex-col items-center gap-2">
             {uploading ? (
-              <>
-                <Loader2 className="h-8 w-8 animate-spin text-neutral-400" />
-                <p className="text-sm font-medium text-neutral-600 dark:text-neutral-300">
-                  Завантаження...
-                </p>
-              </>
+              <div className="mt-3 w-full">
+                <div className="h-2 w-full overflow-hidden rounded bg-neutral-200 dark:bg-neutral-700">
+                  <div className="h-full bg-blue-500 transition-all" style={{ width: `${progress}%` }}/>
+                </div>
+                <p className="mt-1 text-xs text-neutral-500">{progress}%</p>
+              </div>
             ) : (
               <>
                 <Upload className="h-8 w-8 text-neutral-400" />
