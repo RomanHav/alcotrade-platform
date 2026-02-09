@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import VideoUpload from './VideoUpload';
+import { ca } from 'date-fns/locale';
 
 interface MainPageSection {
   id: string;
@@ -21,7 +22,7 @@ export default function MainPageVideoManager({ sections }: MainPageVideoManagerP
   const [saving, setSaving] = useState(false);
 
   // Only show video management for hero and partners sections
-  const videoSections = sections.filter((s) => ['hero', 'partners'].includes(s.key));
+  const videoSections = sections.filter((s) => ['hero', 'partners', 'capabilities'].includes(s.key));
 
   const handleVideoUpload = async (
     sectionId: string,
@@ -81,6 +82,7 @@ export default function MainPageVideoManager({ sections }: MainPageVideoManagerP
   const sectionLabels: Record<string, { label: string; muted: boolean }> = {
     hero: { label: 'Відео головної (без звука)', muted: true },
     partners: { label: 'Відео Партнерів', muted: false },
+    capabilities: { label: 'Відео Потужності', muted: false },
   };
 
   return (
