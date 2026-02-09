@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       };
 
       // Include video URL for hero and partners sections
-      if (section.videoUrl && ['hero', 'partners'].includes(section.key)) {
+      if (section.videoUrl && ['hero', 'partners', 'capabilities'].includes(section.key)) {
         sectionData.videoUrl = section.videoUrl;
       }
 
